@@ -1,0 +1,87 @@
+:root {
+  --primary-color: #1BA2E0;
+  --primary-hover: #1484b8;
+  --bg-card-light: #ffffff;
+  --bg-card-dark: #1e2227;
+}
+
+.text-primary-custom { color: var(--primary-color) !important; }
+.bg-primary-custom { background-color: var(--primary-color) !important; }
+.btn-primary-custom { background-color: var(--primary-color) !important; border-color: var(--primary-color) !important; }
+.btn-primary-custom:hover { background-color: var(--primary-hover) !important; }
+
+.brand-badge {
+  width: 38px;
+  height: 38px;
+  background-color: var(--primary-color);
+  color: #fff;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+}
+
+.icon-circle {
+  width: 54px;
+  height: 54px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.icon-circle-sm {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.max-w-container { max-width: 1200px; }
+.cursor-pointer { cursor: pointer; }
+
+.card-hover { transition: transform 0.15s ease, box-shadow 0.15s ease; }
+.card-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.08) !important;
+}
+
+.badge-label {
+  font-size: 0.7rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  color: var(--primary-color);
+}
+
+.indicator-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.donut-chart { width: 130px; height: 130px; transform: rotate(-90deg); }
+.donut-bg { fill: none; stroke: #e9ecef; stroke-width: 3.5; }
+[data-bs-theme="dark"] .donut-bg { stroke: #2b3035; }
+
+.donut-approved {
+  fill: none;
+  stroke: var(--primary-color);
+  stroke-width: 3.5;
+  transition: stroke-dasharray 0.6s ease;
+}
+
+.donut-text {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.font-xs { font-size: 0.65rem; }
+
+[data-bs-theme="dark"] .bg-surface { background-color: var(--bg-card-dark) !important; }
+[data-bs-theme="dark"] .card { border-color: #2b3035 !important; }
