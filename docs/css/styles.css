@@ -1,14 +1,22 @@
+/* Color institucional SIA-UCALDAS */
 :root {
   --primary-color: #1BA2E0;
   --primary-hover: #1484b8;
-  --bg-card-light: #ffffff;
-  --bg-card-dark: #1e2227;
+  --bg-dark-main: #121417;
+  --bg-dark-card: #181b20;
+  --border-dark: #2b3035;
 }
 
+/* Clases institucionales */
 .text-primary-custom { color: var(--primary-color) !important; }
 .bg-primary-custom { background-color: var(--primary-color) !important; }
-.btn-primary-custom { background-color: var(--primary-color) !important; border-color: var(--primary-color) !important; }
-.btn-primary-custom:hover { background-color: var(--primary-hover) !important; }
+.btn-primary-custom { 
+  background-color: var(--primary-color) !important; 
+  border-color: var(--primary-color) !important; 
+}
+.btn-primary-custom:hover { 
+  background-color: var(--primary-hover) !important; 
+}
 
 .brand-badge {
   width: 38px;
@@ -43,10 +51,12 @@
 .max-w-container { max-width: 1200px; }
 .cursor-pointer { cursor: pointer; }
 
-.card-hover { transition: transform 0.15s ease, box-shadow 0.15s ease; }
+.card-hover { 
+  transition: transform 0.15s ease, box-shadow 0.15s ease; 
+}
 .card-hover:hover {
   transform: translateY(-2px);
-  box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.08) !important;
+  box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15) !important;
 }
 
 .badge-label {
@@ -63,17 +73,15 @@
   display: inline-block;
 }
 
+/* Gráfico circular de dona */
 .donut-chart { width: 130px; height: 130px; transform: rotate(-90deg); }
 .donut-bg { fill: none; stroke: #e9ecef; stroke-width: 3.5; }
-[data-bs-theme="dark"] .donut-bg { stroke: #2b3035; }
-
 .donut-approved {
   fill: none;
   stroke: var(--primary-color);
   stroke-width: 3.5;
   transition: stroke-dasharray 0.6s ease;
 }
-
 .donut-text {
   position: absolute;
   top: 50%;
@@ -82,6 +90,59 @@
 }
 
 .font-xs { font-size: 0.65rem; }
+[data-bs-theme="dark"] body,
+[data-bs-theme="dark"].bg-light,
+[data-bs-theme="dark"] .bg-light {
+  background-color: var(--bg-dark-main) !important;
+  color: #e9ecef;
+}
 
-[data-bs-theme="dark"] .bg-surface { background-color: var(--bg-card-dark) !important; }
-[data-bs-theme="dark"] .card { border-color: #2b3035 !important; }
+/* Header y Footer en modo oscuro */
+[data-bs-theme="dark"] header,
+[data-bs-theme="dark"] footer,
+[data-bs-theme="dark"] .bg-white {
+  background-color: var(--bg-dark-card) !important;
+  color: #e9ecef !important;
+  border-color: var(--border-dark) !important;
+}
+
+/* Tarjetas, superficies y modales */
+[data-bs-theme="dark"] .bg-surface,
+[data-bs-theme="dark"] .card,
+[data-bs-theme="dark"] .modal-content {
+  background-color: var(--bg-dark-card) !important;
+  color: #e9ecef;
+  border-color: var(--border-dark) !important;
+}
+
+/* Listas dentro de los modales */
+[data-bs-theme="dark"] .list-group-item {
+  background-color: var(--bg-dark-card) !important;
+  color: #e9ecef !important;
+  border-color: var(--border-dark) !important;
+}
+
+/* Textos oscuros que deben volverse claros */
+[data-bs-theme="dark"] .text-dark-emphasis,
+[data-bs-theme="dark"] h1,
+[data-bs-theme="dark"] h2,
+[data-bs-theme="dark"] h5,
+[data-bs-theme="dark"] strong {
+  color: #f8f9fa !important;
+}
+
+/* Campos de entrada (inputs) */
+[data-bs-theme="dark"] .form-control,
+[data-bs-theme="dark"] .input-group-text {
+  background-color: var(--bg-dark-main) !important;
+  border-color: var(--border-dark) !important;
+  color: #ffffff !important;
+}
+
+[data-bs-theme="dark"] .donut-bg {
+  stroke: var(--border-dark);
+}
+
+[data-bs-theme="dark"] .btn-close {
+  filter: invert(1) grayscale(100%) brightness(200%);
+}
