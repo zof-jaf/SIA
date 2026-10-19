@@ -1,17 +1,17 @@
 const express = require('express');
-const errorHandler = require('./middlewares/errorHandler');
-
 const app = express();
 
-app.use(express.json());
+app.use(express.json()); // Vital para poder leer JSON en los req.body
 
+// Importar rutas
+const userRoutes = require('./routes/userRoutes');
+
+// Usar rutas
+app.use('/api/users', userRoutes);
+
+// Ruta de salud que ya tenías
 app.get('/api/health', (req, res) => {
-    res.json({
-        status: 'ok',
-        message: 'Servidor funcionando correctamente'
-    });
+  res.json({ status: 'OK', message: 'Servidor activo' });
 });
-
-app.use(errorHandler);
 
 module.exports = app;
