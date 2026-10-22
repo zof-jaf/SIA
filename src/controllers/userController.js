@@ -45,7 +45,7 @@ class UserController {
       // Validar credenciales usando el servicio
       const user = await userService.authenticateUser(email, password);
 
-      // Generar un Token JWT válido por 8 horas (asegúrate de tener JWT_SECRET en tu .env o usa un texto por defecto temporal)
+      // Generar un Token JWT válido por 8 horas 
       const secretKey = process.env.JWT_SECRET || 'secreto_universidad_web2';
       const token = jwt.sign(
         { id: user.id, email: user.email, rol: user.rol },
@@ -53,7 +53,7 @@ class UserController {
         { expiresIn: '8h' }
       );
 
-      // Responder con el token y los datos del usuario (sin contraseña)
+      // Responder con el token y los datos del usuario
       res.json({
         success: true,
         message: 'Login exitoso',

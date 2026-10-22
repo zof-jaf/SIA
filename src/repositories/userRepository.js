@@ -1,7 +1,7 @@
 const pool = require('../config/db');
 
 class UserRepository {
-  // Buscar un usuario por su correo electrónico (vital para el Login)
+  // Buscar un usuario por su correo electrónico
   async findByEmail(email) {
     const query = `
       SELECT u.id, u.nombre, u.apellido, u.email, u.password_hash, u.activo, r.nombre as rol
