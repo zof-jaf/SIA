@@ -1,11 +1,13 @@
 const express = require('express');
 const router = express.Router();
 const userController = require('../controllers/userController');
+const authMiddleware = require('../middlewares/authMiddleware');
+const requireRole = require('../middlewares/roleMiddleware');
 
-// Ruta de prueba para consultar los roles en la BD
-router.get('/test-db', userController.testConnection);
+// Ruta pública para el Login
+router.post('/login', userController.login);
 
-// Ruta para registrar usuarios
-router.post('/register', userController.register);
+// RUTA PROTEGIDA: Solo un usuario con rol 'Administrador' puede registrar nuevos usuarios
+router.post('/register', authMiddleware, requireRole(['Administrador']), userController.register);
 
 module.exports = router;
