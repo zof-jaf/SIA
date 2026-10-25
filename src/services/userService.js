@@ -1,24 +1,16 @@
-const bcrypt = require('bcrypt');
 const userRepository = require('../repositories/userRepository');
+const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
 
 class UserService {
-  // Lógica para registrar un usuario nuevo con contraseña encriptada
-  async registerUser(nombre, apellido, email, password, rolId) {
-    const existingUser = await userRepository.findByEmail(email);
-    if (existingUser) {
-      throw new Error('El correo electrónico ya está registrado.');
-    }
-
-    const saltRounds = 10;
-    const passwordHash = await bcrypt.hash(password, saltRounds);
-
-    const newUser = await userRepository.createUser(nombre, apellido, email, passwordHash, rolId);
-    return newUser;
-  }
-
-  // Lógica para validar el login de un usuario
+  
   async authenticateUser(email, password) {
-    const user = await userRepository.findByEmail(email);
+    // 1. Limpieza de espacios accidentales
+    const cleanEmail = email ? email.trim() : '';
+    const cleanPassword = password ? password.trim() : '';
+
+    const user = await userRepository.findByEmail(cleanEmail);
+
     if (!user) {
       throw new Error('Credenciales inválidas.');
     }
@@ -27,13 +19,59 @@ class UserService {
       throw new Error('El usuario se encuentra inactivo.');
     }
 
-    const isPasswordValid = await bcrypt.compare(password, user.password_hash);
+    // 2. Comparación explícita con bcrypt
+    const isPasswordValid = await bcrypt.compare(cleanPassword, user.password_hash);
+    
     if (!isPasswordValid) {
       throw new Error('Credenciales inválidas.');
     }
 
-    const { password_hash, ...userWithoutPassword } = user;
-    return userWithoutPassword;
+    // 3. Generación de Token JWT
+    const payload = {
+      id: user.id,
+      email: user.email,
+      rol: user.rol
+    };
+
+    const token = jwt.sign(
+      payload,
+      process.env.JWT_SECRET || 'secreto_por_defecto',
+      { expiresIn: '8h' }
+    );
+
+    return {
+      token,
+      user: {
+        id: user.id,
+        nombre: user.nombre,
+        apellido: user.apellido,
+        email: user.email,
+        rol: user.rol
+      }
+    };
+  }
+
+  async register(userData) {
+    const { nombre, apellido, email, password, rol_id, activo } = userData;
+
+    const existingUser = await userRepository.findByEmail(email);
+    if (existingUser) {
+      throw new Error('El correo electrónico ya se encuentra registrado.');
+    }
+
+    const saltRounds = 10;
+    const password_hash = await bcrypt.hash(password, saltRounds);
+
+    const newUser = await userRepository.create({
+      nombre,
+      apellido,
+      email,
+      password_hash,
+      rol_id,
+      activo: activo !== undefined ? activo : true
+    });
+
+    return newUser;
   }
 }
 
