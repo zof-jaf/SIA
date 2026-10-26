@@ -7,11 +7,16 @@ app.use(express.json()); // Vital para poder leer JSON en los req.body
 // Importar rutas
 const userRoutes = require('./routes/userRoutes');
 const academicRoutes = require('./routes/academicRoutes');
+const matriculaRoutes = require('./routes/matriculaRoutes');
+const calificacionRoutes = require('./routes/calificacionRoutes');
 
 
 // Usar rutas
 app.use('/api/users', userRoutes);
 app.use('/api/academic', academicRoutes);
+app.use('/api/matriculas', matriculaRoutes);
+app.use('/api/calificaciones', calificacionRoutes);
+
 
 
 // Ruta de salud que ya tenías
