@@ -5,33 +5,18 @@ const jwt = require('jsonwebtoken');
 class UserService {
   
   async authenticateUser(email, password) {
-    // 1. Limpieza de espacios accidentales
     const cleanEmail = email ? email.trim() : '';
     const cleanPassword = password ? password.trim() : '';
 
     const user = await userRepository.findByEmail(cleanEmail);
 
-    if (!user) {
-      throw new Error('Credenciales inválidas.');
-    }
+    if (!user) throw new Error('Credenciales inválidas.');
+    if (!user.activo) throw new Error('El usuario se encuentra inactivo.');
 
-    if (!user.activo) {
-      throw new Error('El usuario se encuentra inactivo.');
-    }
-
-    // 2. Comparación explícita con bcrypt
     const isPasswordValid = await bcrypt.compare(cleanPassword, user.password_hash);
-    
-    if (!isPasswordValid) {
-      throw new Error('Credenciales inválidas.');
-    }
+    if (!isPasswordValid) throw new Error('Credenciales inválidas.');
 
-    // 3. Generación de Token JWT
-    const payload = {
-      id: user.id,
-      email: user.email,
-      rol: user.rol
-    };
+    const payload = { id: user.id, email: user.email, rol: user.rol };
 
     const token = jwt.sign(
       payload,
@@ -51,27 +36,52 @@ class UserService {
     };
   }
 
-  async register(userData) {
-    const { nombre, apellido, email, password, rol_id, activo } = userData;
+  // Registrar Estudiante
+  async registerStudent(data) {
+    const existing = await userRepository.findByEmail(data.email);
+    if (existing) throw new Error('El correo ya está registrado.');
 
-    const existingUser = await userRepository.findByEmail(email);
-    if (existingUser) {
-      throw new Error('El correo electrónico ya se encuentra registrado.');
-    }
-
-    const saltRounds = 10;
-    const password_hash = await bcrypt.hash(password, saltRounds);
-
-    const newUser = await userRepository.create({
-      nombre,
-      apellido,
-      email,
+    const password_hash = await bcrypt.hash(data.password, 10);
+    return await userRepository.createStudent({
+      ...data,
       password_hash,
-      rol_id,
-      activo: activo !== undefined ? activo : true
+      activo: data.activo !== undefined ? data.activo : true
     });
+  }
 
-    return newUser;
+  // Registrar Profesor
+  async registerProfessor(data) {
+    const existing = await userRepository.findByEmail(data.email);
+    if (existing) throw new Error('El correo ya está registrado.');
+
+    const password_hash = await bcrypt.hash(data.password, 10);
+    return await userRepository.createProfessor({
+      ...data,
+      password_hash,
+      activo: data.activo !== undefined ? data.activo : true
+    });
+  }
+
+  // Registrar Administrador
+  async registerAdmin(data) {
+    const existing = await userRepository.findByEmail(data.email);
+    if (existing) throw new Error('El correo ya está registrado.');
+
+    const password_hash = await bcrypt.hash(data.password, 10);
+    return await userRepository.createAdmin({
+      ...data,
+      password_hash,
+      activo: data.activo !== undefined ? data.activo : true
+    });
+  }
+
+  // Listar
+  async getStudents() { return await userRepository.getAllStudents(); }
+  async getProfessors() { return await userRepository.getAllProfessors(); }
+
+  // Activar / Desactivar
+  async setUserStatus(userId, status) {
+    return await userRepository.toggleUserActive(userId, status);
   }
 }
 
