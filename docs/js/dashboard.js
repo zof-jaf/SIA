@@ -1,22 +1,58 @@
 // Verificar sesión activa
-if (sessionStorage.getItem("sia_is_logged") !== "true") {
-  window.location.href = "index.html";
+async function checkAuth() {
+  try {
+    const response = await fetch("/api/auth/me", {
+      method: "GET",
+      credentials: "include" 
+    });
+
+    if (!response.ok) {
+      window.location.href = "index.html";
+    }
+  } catch (error) {
+    console.error("Error al verificar autenticación con el servidor:", error);
+    window.location.href = "index.html";
+  }
 }
+
+checkAuth();
 
 const studentName = sessionStorage.getItem("sia_user_name") || "Estudiante";
 const studentCode = sessionStorage.getItem("sia_user_code") || "202214982";
 
-document.getElementById("navUserName").textContent = studentName;
-document.getElementById("dashWelcomeTitle").textContent = `Bienvenido, ${studentName}`;
-document.getElementById("dashCode").textContent = studentCode;
-document.getElementById("profileName").textContent = studentName;
-document.getElementById("profileCode").textContent = `Código: ${studentCode}`;
+const navUserName = document.getElementById("navUserName");
+if (navUserName) navUserName.textContent = studentName;
+
+const dashWelcomeTitle = document.getElementById("dashWelcomeTitle");
+if (dashWelcomeTitle) dashWelcomeTitle.textContent = `Bienvenido, ${studentName}`;
+
+const dashCode = document.getElementById("dashCode");
+if (dashCode) dashCode.textContent = studentCode;
+
+const profileName = document.getElementById("profileName");
+if (profileName) profileName.textContent = studentName;
+
+const profileCode = document.getElementById("profileCode");
+if (profileCode) profileCode.textContent = `Código: ${studentCode}`;
 
 // Cerrar sesión
-document.getElementById("btnLogout").addEventListener("click", () => {
-  sessionStorage.clear();
-  window.location.href = "index.html";
-});
+const btnLogout = document.getElementById("btnLogout");
+if (btnLogout) {
+  btnLogout.addEventListener("click", async () => {
+    try {
+      await fetch("/api/auth/logout", {
+        method: "POST",
+        credentials: "include"
+      });
+    } catch (error) {
+      console.error("Error al notificar cierre de sesión:", error);
+    } finally {
+      sessionStorage.clear();
+      window.location.href = "index.html";
+    }
+  });
+}
+
 
 // Tema Oscuro
 const themeToggle = document.getElementById("themeToggle");

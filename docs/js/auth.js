@@ -1,11 +1,4 @@
-// ==========================================
-// 📌 USUARIO DE PRUEBA
-// ==========================================
-const USUARIO_PRUEBA = {
-  usuario: "202214982",
-  clave: "123",
-  nombre: "Julián Andrés Flórez"
-};
+
 
 // Botón para autocompletar credenciales de prueba
 const btnAutoDemo = document.getElementById("btnAutoDemo");
@@ -19,31 +12,58 @@ if (btnAutoDemo) {
 // Envío del formulario de Login
 const loginForm = document.getElementById("loginForm");
 if (loginForm) {
-  loginForm.addEventListener("submit", (e) => {
+  loginForm.addEventListener("submit", async (e) => { // <-- Agregado 'async' aquí
     e.preventDefault();
     const usernameInput = document.getElementById("username").value.trim();
     const passwordInput = document.getElementById("password").value.trim();
     const errorBox = document.getElementById("loginError");
 
     if (!usernameInput || !passwordInput) {
-      errorBox.textContent = "Por favor ingresa usuario y contraseña.";
-      errorBox.classList.remove("d-none");
+      if (errorBox) {
+        errorBox.textContent = "Por favor ingresa usuario y contraseña.";
+        errorBox.classList.remove("d-none");
+      }
       return;
     }
 
-    // Permite cualquier usuario: si es el de prueba usa su nombre, si es otro usa el escrito
+    if (errorBox) errorBox.classList.add("d-none");
+
     let nombreFinal = USUARIO_PRUEBA.nombre;
     if (usernameInput !== USUARIO_PRUEBA.usuario) {
       nombreFinal = isNaN(usernameInput) ? usernameInput : `Estudiante (${usernameInput})`;
     }
 
-    // Guardar en la sesión del navegador
-    sessionStorage.setItem("sia_user_code", usernameInput);
-    sessionStorage.setItem("sia_user_name", nombreFinal);
-    sessionStorage.setItem("sia_is_logged", "true");
+    try {
+      // Ahora sí se permite el uso de 'await'
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          username: usernameInput,
+          password: passwordInput
+        })
+      });
 
-    // Redirigir al Dashboard
-    window.location.href = "dashboard.html";
+      const data = await response.json();
+
+      if (response.ok) {
+        sessionStorage.setItem("sia_user_code", usernameInput);
+        sessionStorage.setItem("sia_user_name", nombreFinal);
+        window.location.href = "dashboard.html";
+      } else {
+        if (errorBox) {
+          errorBox.textContent = data.message || "Usuario o contraseña incorrectos.";
+          errorBox.classList.remove("d-none");
+        }
+      }
+    } catch (error) {
+      console.error("Error al conectar con el servidor:", error);
+      if (errorBox) {
+        errorBox.textContent = "Error al conectar con el servidor.";
+        errorBox.classList.remove("d-none");
+      }
+    }
   });
 }
 
