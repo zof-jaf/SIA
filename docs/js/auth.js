@@ -1,26 +1,25 @@
-
-
-// Botón para autocompletar credenciales de prueba
 const btnAutoDemo = document.getElementById("btnAutoDemo");
 if (btnAutoDemo) {
   btnAutoDemo.addEventListener("click", () => {
-    document.getElementById("username").value = USUARIO_PRUEBA.usuario;
-    document.getElementById("password").value = USUARIO_PRUEBA.clave;
+    const emailField = document.getElementById("email") || document.getElementById("username");
+    if (emailField) emailField.value = "estudiante@ucaldas.edu.co";
+    document.getElementById("password").value = "123456";
   });
 }
 
-// Envío del formulario de Login
 const loginForm = document.getElementById("loginForm");
 if (loginForm) {
   loginForm.addEventListener("submit", async (e) => { 
     e.preventDefault();
-    const usernameInput = document.getElementById("username").value.trim();
+
+    const emailField = document.getElementById("email") || document.getElementById("username");
+    const emailInput = emailField ? emailField.value.trim() : "";
     const passwordInput = document.getElementById("password").value.trim();
     const errorBox = document.getElementById("loginError");
 
-    if (!usernameInput || !passwordInput) {
+    if (!emailInput || !passwordInput) {
       if (errorBox) {
-        errorBox.textContent = "Por favor ingresa usuario y contraseña.";
+        errorBox.textContent = "Por favor ingresa correo y contraseña.";
         errorBox.classList.remove("d-none");
       }
       return;
@@ -28,18 +27,13 @@ if (loginForm) {
 
     if (errorBox) errorBox.classList.add("d-none");
 
-    let nombreFinal = USUARIO_PRUEBA.nombre;
-    if (usernameInput !== USUARIO_PRUEBA.usuario) {
-      nombreFinal = isNaN(usernameInput) ? usernameInput : `Estudiante (${usernameInput})`;
-    }
-
     try {
       const response = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({
-          username: usernameInput,
+          email: emailInput,
           password: passwordInput
         })
       });
@@ -47,12 +41,12 @@ if (loginForm) {
       const data = await response.json();
 
       if (response.ok) {
-        sessionStorage.setItem("sia_user_code", usernameInput);
-        sessionStorage.setItem("sia_user_name", nombreFinal);
+        sessionStorage.setItem("sia_user_code", data.user?.email || emailInput);
+        sessionStorage.setItem("sia_user_name", data.user?.name || "Estudiante");
         window.location.href = "dashboard.html";
       } else {
         if (errorBox) {
-          errorBox.textContent = data.message || "Usuario o contraseña incorrectos.";
+          errorBox.textContent = data.message || "Correo o contraseña incorrectos.";
           errorBox.classList.remove("d-none");
         }
       }
