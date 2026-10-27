@@ -11,7 +11,6 @@ const matriculaRoutes = require('./routes/matriculaRoutes');
 const calificacionRoutes = require('./routes/calificacionRoutes');
 
 
-// Usar rutas
 app.use('/api/users', userRoutes);
 app.use('/api/academic', academicRoutes);
 app.use('/api/matriculas', matriculaRoutes);
@@ -19,7 +18,6 @@ app.use('/api/calificaciones', calificacionRoutes);
 
 
 
-// Ruta de salud que ya tenías
 app.get('/api/health', (req, res) => {
   res.json({ status: 'OK', message: 'Servidor activo' });
 });
