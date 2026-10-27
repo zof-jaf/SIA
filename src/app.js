@@ -1,4 +1,7 @@
 const express = require('express');
+const path = require('path');
+const errorHandler = require('./middlewares/errorHandler');
+
 const app = express();
 
 
@@ -17,6 +20,8 @@ app.use('/api/matriculas', matriculaRoutes);
 app.use('/api/calificaciones', calificacionRoutes);
 
 
+
+app.use(express.static(path.join(__dirname, '../docs')));
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'OK', message: 'Servidor activo' });

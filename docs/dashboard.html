@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="es" data-bs-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SIA-UCALDAS - Portal Estudiantil</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body class="bg-light d-flex flex-column min-vh-100 justify-content-between">
+
+  <!-- Header -->
+  <header class="navbar navbar-expand-lg border-bottom bg-white sticky-top shadow-sm px-3 py-2">
+    <div class="container-fluid max-w-container">
+      <div class="d-flex align-items-center gap-2">
+        <div class="brand-badge">U</div>
+        <span class="fw-bold fs-5 text-primary-custom">SIA-UCALDAS</span>
+      </div>
+
+      <div class="d-flex align-items-center gap-2">
+        <button id="themeToggle" class="btn btn-sm btn-outline-secondary d-flex align-items-center gap-1">
+          <i class="bi bi-moon-fill" id="themeIcon"></i>
+        </button>
+
+        <button class="btn btn-sm btn-outline-primary d-flex align-items-center gap-2" data-bs-toggle="modal" data-bs-target="#modalPerfil">
+          <i class="bi bi-person-circle"></i>
+          <span id="navUserName" class="d-none d-sm-inline fw-semibold">Estudiante</span>
+        </button>
+
+        <button id="btnLogout" class="btn btn-sm btn-primary-custom text-white d-flex align-items-center gap-1">
+          <i class="bi bi-box-arrow-right"></i>
+          <span class="d-none d-sm-inline">Salir</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Contenido -->
+  <main class="container max-w-container py-4 flex-grow-1">
+
+    <!-- Bienvenida -->
+    <div class="card border-0 shadow-sm rounded-4 p-4 mb-4 bg-surface">
+      <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
+        <div>
+          <span class="small text-uppercase fw-bold text-primary-custom">Sistema Integrado Académico · SIA</span>
+          <h1 class="h3 fw-bold mb-1" id="dashWelcomeTitle">Bienvenido</h1>
+          <p class="text-muted small mb-0" id="dashSubInfo">
+            Ingeniería de Sistemas y Computación · Código: <strong id="dashCode">-</strong> · Campus Central
+          </p>
+        </div>
+
+        <div class="d-flex flex-wrap gap-2">
+          <button id="btnToggleDebt" class="btn btn-sm btn-outline-warning">
+            Simular: <span id="debtBtnLabel">Con Deuda</span>
+          </button>
+          <button id="btnToggleProcedures" class="btn btn-sm btn-outline-info">
+            Simular: <span id="procBtnLabel">1 Trámite</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Las 5 Tarjetas Requeridas -->
+    <div class="row g-4">
+
+      <!-- 1. SIGUIENTE CLASE ASIGNADA (con salón y hora de inicio) -->
+      <div class="col-12 col-md-6 col-lg-4">
+        <div class="card card-hover h-100 border-0 shadow-sm rounded-4 p-3 bg-surface cursor-pointer" data-bs-toggle="modal" data-bs-target="#modalHorario">
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <span class="badge-label">Siguiente Clase Asignada</span>
+            <div class="icon-circle-sm bg-primary-custom text-white"><i class="bi bi-clock-history"></i></div>
+          </div>
+          <h2 class="h5 fw-bold text-dark-emphasis mb-2">Arquitectura de Software</h2>
+          
+          <div class="small text-muted mt-2">
+            <div class="mb-1">
+              <i class="bi bi-alarm text-primary-custom me-2"></i>
+              <strong>Hora de inicio:</strong> <span class="fw-bold text-primary-custom">10:00 AM</span> (10:00 AM - 12:00 PM)
+            </div>
+            <div class="mb-1">
+              <i class="bi bi-geo-alt text-primary-custom me-2"></i>
+              <strong>Salón:</strong> <span class="fw-semibold">Salón C-302</span> (Edificio Central)
+            </div>
+            <div>
+              <i class="bi bi-person-badge text-primary-custom me-2"></i>
+              <span>Ing. Carlos Hernán Restrepo</span>
+            </div>
+          </div>
+
+          <div class="border-top mt-auto pt-3 d-flex justify-content-between align-items-center text-primary-custom fw-semibold small">
+            <span>Ver horario completo</span>
+            <i class="bi bi-chevron-right"></i>
+          </div>
+        </div>
+      </div>
+
+      <!-- 2. AVANCE ACADÉMICO (Gráfico dona: solo aprobado y pendiente) -->
+      <div class="col-12 col-md-6 col-lg-8">
+        <div class="card card-hover h-100 border-0 shadow-sm rounded-4 p-3 bg-surface cursor-pointer" data-bs-toggle="modal" data-bs-target="#modalProgreso">
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <div>
+              <span class="badge-label">Avance Académico</span>
+              <h2 class="h5 fw-bold text-dark-emphasis mb-0">Progreso del Plan de Estudios</h2>
+            </div>
+            <div class="icon-circle-sm bg-primary-custom text-white"><i class="bi bi-mortarboard"></i></div>
+          </div>
+          <p class="text-muted small mb-3">Total del programa: 160 créditos</p>
+
+          <div class="row align-items-center">
+            <!-- Gráfico Donut SVG -->
+            <div class="col-12 col-sm-5 text-center mb-3 mb-sm-0 position-relative">
+              <svg viewBox="0 0 36 36" class="donut-chart mx-auto">
+                <path class="donut-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                <path class="donut-approved" stroke-dasharray="72, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+              </svg>
+              <div class="donut-text">
+                <span class="fw-bold fs-4">72%</span>
+                <span class="text-muted small text-uppercase d-block font-xs">Avance</span>
+              </div>
+            </div>
+
+            <!-- Leyenda: Solo Aprobado y Pendiente -->
+            <div class="col-12 col-sm-7">
+              <div class="p-2 border-bottom d-flex justify-content-between align-items-center">
+                <div class="d-flex align-items-center gap-2">
+                  <span class="indicator-dot bg-primary-custom"></span>
+                  <span class="fw-semibold small">Aprobado</span>
+                </div>
+                <span class="fw-bold small">115 créditos (72%)</span>
+              </div>
+              <div class="p-2 d-flex justify-content-between align-items-center">
+                <div class="d-flex align-items-center gap-2">
+                  <span class="indicator-dot bg-secondary"></span>
+                  <span class="fw-semibold small">Pendiente</span>
+                </div>
+                <span class="fw-bold small">45 créditos (28%)</span>
+              </div>
+              <small class="text-muted d-block mt-2">Promedio acumulado: <strong>4.35</strong></small>
+            </div>
+          </div>
+
+          <div class="border-top mt-auto pt-3 d-flex justify-content-between align-items-center text-primary-custom fw-semibold small">
+            <span>Ver materias cursadas y pendientes</span>
+            <i class="bi bi-chevron-right"></i>
+          </div>
+        </div>
+      </div>
+
+      <!-- 3. ESTADO FINANCIERO (Muestra SOLO el saldo pendiente) -->
+      <div class="col-12 col-md-6 col-lg-4">
+        <div class="card card-hover h-100 border-0 shadow-sm rounded-4 p-3 bg-surface cursor-pointer" data-bs-toggle="modal" data-bs-target="#modalFinanzas">
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <span class="badge-label">Estado Financiero</span>
+            <div class="icon-circle-sm bg-primary-custom text-white"><i class="bi bi-currency-dollar"></i></div>
+          </div>
+          <h2 class="h6 fw-semibold text-muted mb-1">Saldo Pendiente Actual</h2>
+          
+          <div class="my-3">
+            <div class="fs-2 fw-black" id="financialBalance">$0.00 COP</div>
+            <div id="financialStatusBadge" class="mt-2 text-success small fw-semibold">
+              <i class="bi bi-check-circle-fill me-1"></i> Al día · Sin saldo pendiente
+            </div>
+          </div>
+
+          <p class="text-muted small">Periodo académico 2026-1.</p>
+
+          <div class="border-top mt-auto pt-3 d-flex justify-content-between align-items-center text-primary-custom fw-semibold small">
+            <span>Ver recibos de pago</span>
+            <i class="bi bi-chevron-right"></i>
+          </div>
+        </div>
+      </div>
+
+      <!-- 4. EVALUACIÓN DOCENTE (Solo título y enlace en toda la tarjeta) -->
+      <div class="col-12 col-md-6 col-lg-4">
+        <a href="https://evaluaciondocente.ucaldas.edu.co" target="_blank" class="text-decoration-none card card-hover h-100 border-0 shadow-sm rounded-4 p-3 bg-surface d-flex flex-column">
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <span class="badge-label">Procesos Académicos</span>
+            <div class="icon-circle-sm bg-primary-custom text-white"><i class="bi bi-award"></i></div>
+          </div>
+          
+          <h2 class="h5 fw-bold text-dark-emphasis mb-2">Evaluación Docente</h2>
+          <p class="text-muted small">
+            Ingresa a la plataforma oficial para realizar la evaluación de tus profesores.
+          </p>
+
+          <div class="border-top mt-auto pt-3 d-flex justify-content-between align-items-center text-primary-custom fw-semibold small">
+            <span>Acceder a la evaluación</span>
+            <i class="bi bi-box-arrow-up-right"></i>
+          </div>
+        </a>
+      </div>
+
+      <!-- 5. GESTIÓN DE TRÁMITES (Trámite en curso o sin pendientes) -->
+      <div class="col-12 col-md-6 col-lg-4">
+        <div class="card card-hover h-100 border-0 shadow-sm rounded-4 p-3 bg-surface cursor-pointer" data-bs-toggle="modal" data-bs-target="#modalTramites">
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <span class="badge-label">Ventanilla Académica</span>
+            <div class="icon-circle-sm bg-primary-custom text-white"><i class="bi bi-file-earmark-text"></i></div>
+          </div>
+          
+          <h2 class="h5 fw-bold text-dark-emphasis mb-2">Gestión de Trámites</h2>
+
+          <div id="proceduresAlert" class="my-3 p-2 rounded-3 small">
+            <!-- Rellenado por js -->
+          </div>
+
+          <p class="text-muted small">Radicación de certificados oficiales y constancias.</p>
+
+          <div class="border-top mt-auto pt-3 d-flex justify-content-between align-items-center text-primary-custom fw-semibold small">
+            <span>Ingresar a trámites</span>
+            <i class="bi bi-chevron-right"></i>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+  <!-- Modales -->
+  <div class="modal fade" id="modalHorario" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content border-0 rounded-4 shadow">
+        <div class="modal-header border-0 pb-0">
+          <h5 class="modal-title fw-bold">Horario Semanal</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="list-group list-group-flush small" id="scheduleList"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal fade" id="modalProgreso" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+      <div class="modal-content border-0 rounded-4 shadow">
+        <div class="modal-header border-0 pb-0">
+          <h5 class="modal-title fw-bold">Plan de Estudios</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body small">
+          <div class="row g-3">
+            <div class="col-md-6">
+              <h6 class="fw-bold text-success">Aprobadas</h6>
+              <ul class="list-group list-group-flush" id="approvedCoursesList"></ul>
+            </div>
+            <div class="col-md-6">
+              <h6 class="fw-bold text-secondary">Pendientes</h6>
+              <ul class="list-group list-group-flush" id="pendingCoursesList"></ul>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal fade" id="modalFinanzas" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content border-0 rounded-4 shadow">
+        <div class="modal-header border-0 pb-0">
+          <h5 class="modal-title fw-bold">Estado Financiero</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="alert alert-secondary small" id="modalDebtMessage">Saldo al día.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal fade" id="modalTramites" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content border-0 rounded-4 shadow">
+        <div class="modal-header border-0 pb-0">
+          <h5 class="modal-title fw-bold">Trámites Radicados</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="list-group list-group-flush small" id="proceduresListModal"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal fade" id="modalPerfil" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content border-0 rounded-4 shadow">
+        <div class="modal-header border-0 pb-0">
+          <h5 class="modal-title fw-bold">Perfil</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body small">
+          <div class="d-flex align-items-center gap-3 mb-3">
+            <div class="brand-badge fs-4 p-3">U</div>
+            <div>
+              <h5 class="mb-0 fw-bold" id="profileName">-</h5>
+              <span class="text-muted" id="profileCode">-</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <footer class="border-top bg-white py-3 text-center small text-muted">
+    <div class="container">© 2026 SIA-UCALDAS · Universidad de Caldas</div>
+  </footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="js/dashboard.js"></script>
+</body>
+</html>
