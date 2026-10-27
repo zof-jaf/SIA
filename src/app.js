@@ -4,23 +4,27 @@ const errorHandler = require('./middlewares/errorHandler');
 
 const app = express();
 
-app.use(express.json());
+
+app.use(express.json()); // Vital para poder leer JSON en los req.body
+
+// Importar rutas
+const userRoutes = require('./routes/userRoutes');
+const academicRoutes = require('./routes/academicRoutes');
+const matriculaRoutes = require('./routes/matriculaRoutes');
+const calificacionRoutes = require('./routes/calificacionRoutes');
+
+
+app.use('/api/users', userRoutes);
+app.use('/api/academic', academicRoutes);
+app.use('/api/matriculas', matriculaRoutes);
+app.use('/api/calificaciones', calificacionRoutes);
+
+
 
 app.use(express.static(path.join(__dirname, '../docs')));
 
 app.get('/api/health', (req, res) => {
-    res.json({
-        status: 'ok',
-        message: 'Servidor funcionando correctamente'
-    });
+  res.json({ status: 'OK', message: 'Servidor activo' });
 });
-
-app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, '../docs/index.html'));
-});
-
-if (errorHandler) {
-  app.use(errorHandler);
-}
 
 module.exports = app;
