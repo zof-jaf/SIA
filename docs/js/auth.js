@@ -12,7 +12,7 @@ if (btnAutoDemo) {
 // Envío del formulario de Login
 const loginForm = document.getElementById("loginForm");
 if (loginForm) {
-  loginForm.addEventListener("submit", async (e) => { // <-- Agregado 'async' aquí
+  loginForm.addEventListener("submit", async (e) => { 
     e.preventDefault();
     const usernameInput = document.getElementById("username").value.trim();
     const passwordInput = document.getElementById("password").value.trim();
@@ -34,7 +34,6 @@ if (loginForm) {
     }
 
     try {
-      // Ahora sí se permite el uso de 'await'
       const response = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -67,7 +66,6 @@ if (loginForm) {
   });
 }
 
-// Control del tema Claro / Oscuro
 const themeToggle = document.getElementById("themeToggle");
 const themeIcon = document.getElementById("themeIcon");
 const themeText = document.getElementById("themeText");

@@ -14,7 +14,6 @@ const verifyToken = (req, res, next) => {
     const secretKey = process.env.JWT_SECRET || 'secreto_universidad_web2';
     const decoded = jwt.verify(token, secretKey);
     
-    // Adjuntamos la información del usuario a la petición para usarla después
     req.user = decoded;
     next();
   } catch (error) {

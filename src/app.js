@@ -5,9 +5,8 @@ const errorHandler = require('./middlewares/errorHandler');
 const app = express();
 
 
-app.use(express.json()); // Vital para poder leer JSON en los req.body
+app.use(express.json()); 
 
-// Importar rutas
 const userRoutes = require('./routes/userRoutes');
 const academicRoutes = require('./routes/academicRoutes');
 const matriculaRoutes = require('./routes/matriculaRoutes');
