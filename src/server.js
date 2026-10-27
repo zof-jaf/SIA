@@ -14,15 +14,7 @@ app.use(express.static(docsPath));
 app.use('/api/auth', authRoutes);
 
 app.get('/', (req, res) => {
-  const indexPath = path.join(__dirname, '../docs/index.html');
-  
-  res.sendFile(indexPath, (err) => {
-    if (err) {
-      console.error("Error buscando index.html en:", indexPath);
-      console.error("Detalle del error:", err);
-      res.status(404).send(`Error al cargar la página. El servidor buscó en: ${indexPath}. Revisa los nombres de las carpetas.`);
-    }
-  });
+  res.send("¡El servidor Express está respondiendo correctamente!");
 });
 
 const PORT = process.env.PORT || 3000;
