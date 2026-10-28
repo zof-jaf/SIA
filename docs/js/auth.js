@@ -1,11 +1,4 @@
-const btnAutoDemo = document.getElementById("btnAutoDemo");
-if (btnAutoDemo) {
-  btnAutoDemo.addEventListener("click", () => {
-    const emailField = document.getElementById("email") || document.getElementById("username");
-    if (emailField) emailField.value = "estudiante@ucaldas.edu.co";
-    document.getElementById("password").value = "123456";
-  });
-}
+
 
 const loginForm = document.getElementById("loginForm");
 if (loginForm) {
