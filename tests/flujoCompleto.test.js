@@ -8,6 +8,7 @@ describe('Pruebas Automáticas - Sistema Académico', () => {
   let programaId;
   let materiaId;
   let matriculaId;
+  const uniqueSuffix = String(Date.now()).slice(-6);
 
   const adminCredentials = {
     email: 'julian.admin@universidad.edu.co',
@@ -55,8 +56,8 @@ describe('Pruebas Automáticas - Sistema Académico', () => {
       .post('/api/academic/programs')
       .set('Authorization', `Bearer ${adminToken}`)
       .send({
-        nombre: 'Ingeniería de Software Automatizada',
-        codigo: 'ING-AUTO-01'
+        nombre: `Ingeniería de Software Automatizada ${uniqueSuffix}`,
+        codigo: `ING-AUTO-${uniqueSuffix}`
       });
 
     expect(res.statusCode).toBe(201);
@@ -70,8 +71,8 @@ describe('Pruebas Automáticas - Sistema Académico', () => {
       .post('/api/academic/subjects')
       .set('Authorization', `Bearer ${adminToken}`)
       .send({
-        nombre: 'Pruebas Continuas y CI/CD',
-        codigo: 'TST-101',
+        nombre: `Pruebas Continuas y CI/CD ${uniqueSuffix}`,
+        codigo: `TST-${uniqueSuffix}`,
         creditos: 3
       });
 

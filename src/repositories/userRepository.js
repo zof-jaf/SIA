@@ -93,6 +93,42 @@ async createStudent({ nombre, apellido, email, password_hash, fecha_nacimiento, 
     }
   }
 
+  // Crear Administrador (Transacción SQL)
+  async createAdmin({ nombre, apellido, email, password_hash, cargo, activo }) {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+
+      const userQuery = `
+        INSERT INTO usuarios (nombre, apellido, email, password_hash, rol_id, activo)
+        VALUES ($1, $2, $3, $4, (SELECT id FROM roles WHERE nombre = 'ADMINISTRADOR'), $5)
+        RETURNING id, nombre, apellido, email, activo;
+      `;
+      const userRes = await client.query(userQuery, [nombre, apellido, email, password_hash, activo]);
+      const userId = userRes.rows[0].id;
+
+      const adminQuery = `
+        INSERT INTO administradores (usuario_id, cargo)
+        VALUES ($1, $2)
+        RETURNING id, cargo;
+      `;
+      const adminRes = await client.query(adminQuery, [userId, cargo || 'Administrador']);
+
+      await client.query('COMMIT');
+
+      return {
+        ...userRes.rows[0],
+        administrador_id: adminRes.rows[0].id,
+        cargo: adminRes.rows[0].cargo
+      };
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
   // Listar todos los profesores
   async getAllProfessors() {
     const query = `
