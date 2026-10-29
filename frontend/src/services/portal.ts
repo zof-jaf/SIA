@@ -174,6 +174,23 @@ export interface AdminDashboardData {
   programs: { id: number; codigo: string; nombre: string; estudiantes: number }[]
 }
 
+export interface AvailableOffering {
+  id: number
+  materiaId: number
+  codigo: string
+  materia: string
+  creditos: number
+  grupo: string
+  cupo: number
+  estado: string
+  periodo: string
+  periodoActivo: boolean
+  profesor: string
+  estudiantes: number
+  matriculado: boolean
+  horario: string | null
+}
+
 export interface AdminUser {
   estudiante_id?: number
   profesor_id?: number
@@ -269,6 +286,19 @@ interface Envelope<T> {
 export const portalService = {
   studentDashboard: async () => {
     const res = await apiRequest<Envelope<StudentDashboardData>>('/api/portal/student/dashboard')
+    return res.data
+  },
+
+  availableOfferings: async () => {
+    const res = await apiRequest<Envelope<AvailableOffering[]>>('/api/matriculas/ofertas')
+    return res.data
+  },
+
+  enroll: async (ofertaId: number) => {
+    const res = await apiRequest<Envelope<unknown>>('/api/matriculas', {
+      method: 'POST',
+      body: JSON.stringify({ oferta_materia_id: ofertaId }),
+    })
     return res.data
   },
 

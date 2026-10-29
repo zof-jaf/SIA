@@ -4,10 +4,18 @@ const calificacionController = require('../controllers/calificacionController');
 const authMiddleware = require('../middlewares/authMiddleware');
 const requireRole = require('../middlewares/roleMiddleware');
 
-// Registrar o editar nota (Profesores y Administradores)
-router.post('/', authMiddleware, requireRole(['ADMINISTRADOR', 'PROFESOR']), (req, res) => calificacionController.registerCalificacion(req, res));
+router.post(
+  '/',
+  authMiddleware,
+  requireRole(['ADMINISTRADOR', 'PROFESOR']),
+  (req, res) => calificacionController.registerCalificacion(req, res)
+);
 
-// Consultar histórico de notas de un estudiante
-router.get('/estudiante/:estudiante_id', authMiddleware, (req, res) => calificacionController.getHistoricoEstudiante(req, res));
+router.get(
+  '/estudiante/:estudiante_id',
+  authMiddleware,
+  requireRole(['ADMINISTRADOR', 'ESTUDIANTE']),
+  (req, res) => calificacionController.getHistoricoEstudiante(req, res)
+);
 
 module.exports = router;

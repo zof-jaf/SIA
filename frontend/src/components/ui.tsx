@@ -450,3 +450,43 @@ export function SectionHead({
     </div>
   )
 }
+
+/**
+ * Banner reutilizable para confirmaciones y errores de operaciones asíncronas.
+ * @param props Tipo de aviso, contenido y acción opcional de cierre.
+ */
+export function Notice({
+  tone,
+  children,
+  onClose,
+}: {
+  tone: 'success' | 'error' | 'info'
+  children: ReactNode
+  onClose?: () => void
+}) {
+  const tones = {
+    success:
+      'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300',
+    error:
+      'border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-300',
+    info:
+      'border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-500/30 dark:bg-sky-500/10 dark:text-sky-300',
+  }
+
+  return (
+    <div
+      role={tone === 'error' ? 'alert' : 'status'}
+      className={cn(
+        'flex items-center justify-between gap-3 rounded-lg border px-4 py-3 text-sm font-semibold',
+        tones[tone],
+      )}
+    >
+      <span className="flex items-center gap-2">{children}</span>
+      {onClose && (
+        <button type="button" onClick={onClose} className="text-xs underline">
+          Cerrar
+        </button>
+      )}
+    </div>
+  )
+}

@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { LogOut, Menu, Moon, Sun, X, type LucideIcon } from 'lucide-react'
 import { useTheme } from '../context/ThemeContext'
 import { useAuth } from '../context/AuthContext'
@@ -11,6 +11,9 @@ export interface NavItem {
   icon: LucideIcon
 }
 
+/**
+ * Botón compartido para alternar entre tema claro y oscuro.
+ */
 export function ThemeButton() {
   const { theme, toggleTheme } = useTheme()
 
@@ -28,6 +31,10 @@ export function ThemeButton() {
 const initials = (nombre: string, apellido: string) =>
   `${nombre?.charAt(0) || ''}${apellido?.charAt(0) || ''}`.toUpperCase()
 
+/**
+ * Layout común de los paneles: sidebar, cabecera, perfil y navegación por rol.
+ * @param props Título, subtítulo, elementos de navegación y contenido protegido.
+ */
 export default function Layout({
   title,
   subtitle,
@@ -41,7 +48,18 @@ export default function Layout({
 }) {
   const { user, logout } = useAuth()
   const [open, setOpen] = useState(false)
-  const [active, setActive] = useState(nav[0]?.href ?? '#inicio')
+  const [active, setActive] = useState(() => window.location.hash || nav[0]?.href || '#inicio')
+
+  useEffect(() => {
+    const syncActive = () => {
+      const hash = window.location.hash
+      if (hash && nav.some((item) => item.href === hash)) setActive(hash)
+    }
+
+    syncActive()
+    window.addEventListener('hashchange', syncActive)
+    return () => window.removeEventListener('hashchange', syncActive)
+  }, [nav])
 
   const handleLogout = async () => {
     await logout()

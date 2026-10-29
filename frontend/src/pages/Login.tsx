@@ -13,14 +13,29 @@ import {
   Sparkles,
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
-import { roleHome, type Role } from '../services/auth'
+import { resolveRoleHome, type Role } from '../services/auth'
 import { ThemeButton } from '../components/Layout'
 
-const DEMO_ACCOUNTS: { role: Role; label: string; email: string; password: string }[] = [
-  { role: 'ESTUDIANTE', label: 'Estudiante', email: 'estudiante.demo@ucaldas.edu.co', password: 'Demo2026*' },
-  { role: 'PROFESOR', label: 'Profesor', email: 'profesor.demo@ucaldas.edu.co', password: 'Demo2026*' },
-  { role: 'ADMINISTRADOR', label: 'Administrador', email: 'admin.demo@ucaldas.edu.co', password: 'Demo2026*' },
-]
+interface DemoAccount {
+  role: Role
+  label: string
+  email: string
+  password: string
+}
+
+const DEMO_PASSWORD = import.meta.env.VITE_DEMO_PASSWORD || ''
+const DEMO_ACCOUNTS: DemoAccount[] = (
+  [
+    { role: 'ESTUDIANTE', label: 'Estudiante', email: import.meta.env.VITE_DEMO_ESTUDIANTE_EMAIL },
+    { role: 'PROFESOR', label: 'Profesor', email: import.meta.env.VITE_DEMO_PROFESOR_EMAIL },
+    { role: 'ADMINISTRADOR', label: 'Administrador', email: import.meta.env.VITE_DEMO_ADMINISTRADOR_EMAIL },
+  ] as { role: Role; label: string; email?: string }[]
+)
+  .filter((account): account is { role: Role; label: string; email: string } => Boolean(account.email))
+  .map((account) => ({ ...account, password: DEMO_PASSWORD }))
+
+const DEMO_ENABLED =
+  import.meta.env.VITE_ENABLE_DEMO_ACCOUNTS === 'true' && Boolean(DEMO_PASSWORD) && DEMO_ACCOUNTS.length > 0
 
 const FEATURES = [
   { icon: CalendarDays, title: 'Horario y clases', text: 'Consulta tus materias, aulas y docentes del periodo activo.' },
@@ -28,6 +43,10 @@ const FEATURES = [
   { icon: GraduationCap, title: 'Gestión académica', text: 'Administra matrículas, oferta y usuarios desde un solo lugar.' },
 ]
 
+/**
+ * Pantalla de inicio de sesión. Tras autenticar, resuelve el panel según el rol
+ * devuelto por la API y evita cualquier redirección fija al panel de estudiante.
+ */
 export default function Login() {
   const navigate = useNavigate()
   const { login } = useAuth()
@@ -45,7 +64,13 @@ export default function Login() {
 
     try {
       const user = await login(email, password)
-      navigate(roleHome[user.rol], { replace: true })
+      const home = resolveRoleHome(user.rol)
+
+      if (!home) {
+        throw new Error('Tu usuario no tiene un rol habilitado para acceder al portal.')
+      }
+
+      navigate(home, { replace: true })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al iniciar sesión')
     } finally {
@@ -53,7 +78,11 @@ export default function Login() {
     }
   }
 
-  const fillDemo = (account: (typeof DEMO_ACCOUNTS)[number]) => {
+  /**
+   * Rellena el formulario con una cuenta de demostración configurada por entorno.
+   * @param account Cuenta seleccionada.
+   */
+  const fillDemo = (account: DemoAccount) => {
     setEmail(account.email)
     setPassword(account.password)
     setError('')
@@ -135,26 +164,28 @@ export default function Login() {
               </p>
             </div>
 
-            <div className="mb-5 rounded-xl border border-sky-200 bg-sky-50 p-3 dark:border-sky-500/25 dark:bg-sky-500/10">
-              <p className="mb-2 flex items-center gap-1.5 text-xs font-bold text-sky-800 dark:text-sky-300">
-                <Sparkles className="h-3.5 w-3.5" /> Cuentas de demostración
-              </p>
-              <div className="flex flex-wrap gap-2">
-                {DEMO_ACCOUNTS.map((account) => (
-                  <button
-                    key={account.role}
-                    type="button"
-                    onClick={() => fillDemo(account)}
-                    className="rounded-lg border border-sky-200 bg-white px-2.5 py-1 text-xs font-semibold text-sky-700 transition hover:border-sky-400 hover:bg-sky-100 dark:border-sky-500/30 dark:bg-slate-900/40 dark:text-sky-300 dark:hover:bg-sky-500/20"
-                  >
-                    {account.label}
-                  </button>
-                ))}
+            {DEMO_ENABLED && (
+              <div className="mb-5 rounded-xl border border-sky-200 bg-sky-50 p-3 dark:border-sky-500/25 dark:bg-sky-500/10">
+                <p className="mb-2 flex items-center gap-1.5 text-xs font-bold text-sky-800 dark:text-sky-300">
+                  <Sparkles className="h-3.5 w-3.5" /> Cuentas de demostración
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {DEMO_ACCOUNTS.map((account) => (
+                    <button
+                      key={account.role}
+                      type="button"
+                      onClick={() => fillDemo(account)}
+                      className="rounded-lg border border-sky-200 bg-white px-2.5 py-1 text-xs font-semibold text-sky-700 transition hover:border-sky-400 hover:bg-sky-100 dark:border-sky-500/30 dark:bg-slate-900/40 dark:text-sky-300 dark:hover:bg-sky-500/20"
+                    >
+                      {account.label}
+                    </button>
+                  ))}
+                </div>
+                <p className="mt-2 text-[11px] text-sky-700/80 dark:text-sky-300/70">
+                  Credenciales de demostración configuradas por variables de entorno.
+                </p>
               </div>
-              <p className="mt-2 text-[11px] text-sky-700/80 dark:text-sky-300/70">
-                Contraseña para todas: <strong>Demo2026*</strong>
-              </p>
-            </div>
+            )}
 
             {error && (
               <div className="mb-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-300">

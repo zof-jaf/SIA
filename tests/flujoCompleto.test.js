@@ -1,120 +1,187 @@
+const crypto = require('crypto');
 const request = require('supertest');
+const bcrypt = require('bcrypt');
 const app = require('../src/app');
 const pool = require('../src/config/db');
-const bcrypt = require('bcrypt');
+
+/**
+ * Crea un administrador único para la ejecución de pruebas y devuelve sus
+ * credenciales, evitando credenciales fijas en el código.
+ * @returns {Promise<{ email: string, password: string }>} Credenciales de prueba.
+ */
+const createTestAdmin = async () => {
+  const suffix = `${Date.now()}${crypto.randomBytes(3).toString('hex')}`;
+  const email = `admin.test.${suffix}@universidad.edu.co`;
+  const password = crypto.randomBytes(16).toString('hex');
+
+  let roleRes = await pool.query("SELECT id FROM roles WHERE nombre = 'ADMINISTRADOR'");
+  let adminRoleId = roleRes.rows[0]?.id;
+
+  if (!adminRoleId) {
+    const newRole = await pool.query("INSERT INTO roles (nombre) VALUES ('ADMINISTRADOR') RETURNING id");
+    adminRoleId = newRole.rows[0].id;
+  }
+
+  const hashedPassword = await bcrypt.hash(password, 10);
+  await pool.query(
+    'INSERT INTO usuarios (nombre, apellido, email, password_hash, rol_id, activo) VALUES ($1, $2, $3, $4, $5, true)',
+    ['Admin', 'Test', email, hashedPassword, adminRoleId]
+  );
+
+  return { email, password };
+};
 
 describe('Pruebas Automáticas - Sistema Académico', () => {
-  let adminToken;
-  let programaId;
-  let materiaId;
-  let matriculaId;
-  const uniqueSuffix = String(Date.now()).slice(-6);
-
-  const adminCredentials = {
-    email: 'julian.admin@universidad.edu.co',
-    password: 'admin'
-  };
+  const agent = request.agent(app);
+  const suffix = String(Date.now()).slice(-6);
+  let adminCredentials;
+  let studentId;
+  let offeringId;
+  let programId;
+  let subjectId;
+  let enrollmentId;
 
   beforeAll(async () => {
-    // 1. Obtener o crear ID del rol ADMINISTRADOR
-    let roleRes = await pool.query("SELECT id FROM roles WHERE nombre = 'ADMINISTRADOR'");
-    let adminRoleId = roleRes.rows[0]?.id;
-
-    if (!adminRoleId) {
-      const newRole = await pool.query("INSERT INTO roles (nombre) VALUES ('ADMINISTRADOR') RETURNING id");
-      adminRoleId = newRole.rows[0].id;
-    }
-
-    // 2. Verificar o crear el usuario Admin de prueba con la columna password_hash
-    const userRes = await pool.query("SELECT id FROM usuarios WHERE email = $1", [adminCredentials.email]);
-    if (userRes.rows.length === 0) {
-      const hashedPassword = await bcrypt.hash(adminCredentials.password, 10);
-      await pool.query(
-        "INSERT INTO usuarios (nombre, apellido, email, password_hash, rol_id, activo) VALUES ($1, $2, $3, $4, $5, true)",
-        ['Admin', 'Test', adminCredentials.email, hashedPassword, adminRoleId]
-      );
-    }
+    adminCredentials = await createTestAdmin();
   });
 
   afterAll(async () => {
     await pool.end();
   });
 
-  test('1. POST /api/users/login - Debe autenticar al Administrador y retornar un token JWT', async () => {
-    const res = await request(app)
-      .post('/api/users/login')
+  test('1. POST /api/auth/login - Autentica al administrador y crea la sesión', async () => {
+    const res = await agent
+      .post('/api/auth/login')
       .send(adminCredentials);
 
     expect(res.statusCode).toBe(200);
-    
-    adminToken = res.body.token || res.body.data?.token;
-    expect(adminToken).toBeDefined();
+    expect(res.body.user.rol).toBe('ADMINISTRADOR');
+    expect(res.body.token).toBeUndefined();
   });
 
-  test('2. POST /api/academic/programs - Debe registrar un nuevo programa académico', async () => {
-    const res = await request(app)
+  test('2. GET /api/portal/admin/dashboard - Rechaza la petición sin sesión', async () => {
+    const res = await request(app).get('/api/portal/admin/dashboard');
+    expect(res.statusCode).toBe(401);
+  });
+
+  test('3. GET /api/portal/student/dashboard - Impide que un administrador use el panel de estudiante', async () => {
+    const res = await agent.get('/api/portal/student/dashboard');
+    expect(res.statusCode).toBe(403);
+  });
+
+  test('4. POST /api/academic/programs - Registra un programa académico', async () => {
+    const res = await agent
       .post('/api/academic/programs')
-      .set('Authorization', `Bearer ${adminToken}`)
       .send({
-        nombre: `Ingeniería de Software Automatizada ${uniqueSuffix}`,
-        codigo: `ING-AUTO-${uniqueSuffix}`
+        nombre: `Ingeniería de Software Automatizada ${suffix}`,
+        codigo: `ING-AUTO-${suffix}`
       });
 
     expect(res.statusCode).toBe(201);
     expect(res.body.data).toHaveProperty('id');
 
-    programaId = res.body.data.id;
+    programId = res.body.data.id;
+    expect(programId).toBeDefined();
   });
 
-  test('3. POST /api/academic/subjects - Debe registrar una nueva materia', async () => {
-    const res = await request(app)
+  test('5. POST /api/academic/subjects - Registra una materia', async () => {
+    const res = await agent
       .post('/api/academic/subjects')
-      .set('Authorization', `Bearer ${adminToken}`)
       .send({
-        nombre: `Pruebas Continuas y CI/CD ${uniqueSuffix}`,
-        codigo: `TST-${uniqueSuffix}`,
+        nombre: `Pruebas Continuas y CI/CD ${suffix}`,
+        codigo: `TST-${suffix}`,
         creditos: 3
       });
 
     expect(res.statusCode).toBe(201);
     expect(res.body.data).toHaveProperty('id');
 
-    materiaId = res.body.data.id;
+    subjectId = res.body.data.id;
+    expect(subjectId).toBeDefined();
   });
 
-  test('4. POST /api/matriculas - Debe registrar una nueva matrícula', async () => {
-    const res = await request(app)
+  test('6. POST /api/matriculas - Registra una matrícula válida', async () => {
+    const studentRoleRes = await pool.query("SELECT id FROM roles WHERE nombre = 'ESTUDIANTE'");
+    const studentRoleId = studentRoleRes.rows[0]?.id;
+    expect(studentRoleId).toBeDefined();
+
+    const studentUserRes = await pool.query(
+      `INSERT INTO usuarios (nombre, apellido, email, password_hash, rol_id, activo)
+       VALUES ($1, $2, $3, $4, $5, true)
+       RETURNING id`,
+      [
+        'Estudiante',
+        'Prueba',
+        `estudiante.test.${suffix}@universidad.edu.co`,
+        await bcrypt.hash(crypto.randomBytes(16).toString('hex'), 10),
+        studentRoleId
+      ]
+    );
+
+    const studentRes = await pool.query(
+      'INSERT INTO estudiantes (usuario_id, documento, programa_id) VALUES ($1, $2, $3) RETURNING id',
+      [studentUserRes.rows[0].id, `TST-${suffix}`, programId]
+    );
+    studentId = studentRes.rows[0]?.id;
+    expect(studentId).toBeDefined();
+
+    const professorRes = await pool.query('SELECT id FROM profesores ORDER BY id ASC LIMIT 1');
+    expect(professorRes.rows[0]?.id).toBeDefined();
+
+    let periodRes = await pool.query(
+      'SELECT id FROM periodos_academicos WHERE activo = true ORDER BY id ASC LIMIT 1'
+    );
+
+    if (!periodRes.rows[0]?.id) {
+      periodRes = await pool.query(
+        `INSERT INTO periodos_academicos (nombre, fecha_inicio, fecha_fin, activo)
+         VALUES ($1, CURRENT_DATE, CURRENT_DATE + INTERVAL '120 days', true)
+         RETURNING id`,
+        [`Periodo ${suffix}`]
+      );
+    }
+
+    const offeringRes = await pool.query(
+      `INSERT INTO ofertas_materias (materia_id, profesor_id, periodo_id, grupo, cupo, estado)
+       VALUES ($1, $2, $3, $4, 30, 'ABIERTA')
+       RETURNING id`,
+      [subjectId, professorRes.rows[0].id, periodRes.rows[0].id, `TST-${suffix}`]
+    );
+    offeringId = offeringRes.rows[0]?.id;
+    expect(offeringId).toBeDefined();
+
+    const offers = await agent.get(`/api/matriculas/ofertas?estudiante_id=${studentId}`);
+    expect(offers.statusCode).toBe(200);
+    expect(offers.body.data.some((offering) => offering.id === offeringId)).toBe(true);
+
+    const res = await agent
       .post('/api/matriculas')
-      .set('Authorization', `Bearer ${adminToken}`)
       .send({
-        estudiante_id: 1,
-        oferta_materia_id: 1
+        estudiante_id: studentId,
+        oferta_materia_id: offeringId
       });
 
     expect(res.statusCode).toBe(201);
     expect(res.body.data).toHaveProperty('id');
 
-    matriculaId = res.body.data.id;
+    enrollmentId = res.body.data.id;
   });
 
-  test('5. POST /api/calificaciones - Debe registrar una calificación válida', async () => {
-    const res = await request(app)
+  test('7. POST /api/calificaciones - Registra una calificación válida', async () => {
+    const res = await agent
       .post('/api/calificaciones')
-      .set('Authorization', `Bearer ${adminToken}`)
       .send({
-        matricula_id: matriculaId,
-        nota: 4.80,
+        matricula_id: enrollmentId,
+        nota: 4.8,
         observaciones: 'Evaluación integral E2E aprobada'
       });
 
     expect(res.statusCode).toBe(201);
-    expect(res.body.data.nota).toBe('4.80');
+    expect(Number(res.body.data.nota)).toBe(4.8);
   });
 
-  test('6. GET /api/calificaciones/estudiante/1 - Debe consultar el histórico y promedio del estudiante', async () => {
-    const res = await request(app)
-      .get('/api/calificaciones/estudiante/1')
-      .set('Authorization', `Bearer ${adminToken}`);
+  test('8. GET /api/calificaciones/estudiante/:id - Consulta histórico y promedio', async () => {
+    const res = await agent.get(`/api/calificaciones/estudiante/${studentId}`);
 
     expect(res.statusCode).toBe(200);
     expect(res.body.data).toHaveProperty('promedio');

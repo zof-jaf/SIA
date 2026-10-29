@@ -1,7 +1,14 @@
 const pool = require('../config/db');
 
+/**
+ * Acceso a datos de calificaciones.
+ */
 class CalificacionRepository {
-  // Registrar calificación para una matrícula
+  /**
+   * Registra una nueva evaluación para una matrícula.
+   * @param {object} data Matrícula, nota y observaciones.
+   * @returns {Promise<object>} Calificación creada.
+   */
   async createOrUpdateCalificacion({ matricula_id, nota, observaciones }) {
     const query = `
       INSERT INTO calificaciones (matricula_id, nota, observaciones, fecha_registro)
@@ -12,14 +19,18 @@ class CalificacionRepository {
     return result.rows[0];
   }
 
-  // Obtener calificaciones por estudiante
+  /**
+   * Obtiene el histórico de calificaciones de un estudiante.
+   * @param {number|string} estudiante_id Identificador del estudiante.
+   * @returns {Promise<object[]>} Calificaciones con datos de la materia.
+   */
   async getCalificacionesByEstudiante(estudiante_id) {
     const query = `
-      SELECT 
-        c.id as calificacion_id,
-        m.id as matricula_id,
-        mat.nombre as materia,
-        mat.codigo as codigo_materia,
+      SELECT
+        c.id AS calificacion_id,
+        m.id AS matricula_id,
+        mat.nombre AS materia,
+        mat.codigo AS codigo_materia,
         mat.creditos,
         c.nota,
         c.observaciones,

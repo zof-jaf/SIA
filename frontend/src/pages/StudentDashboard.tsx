@@ -14,6 +14,7 @@ import {
   GraduationCap,
   LayoutDashboard,
   MapPin,
+  Plus,
   User,
   TrendingUp,
   Wallet,
@@ -21,25 +22,29 @@ import {
 import Layout from '../components/Layout'
 import {
   Badge,
+  Button,
   Card,
   Donut,
   EmptyState,
   ErrorPanel,
   Modal,
+  Notice,
   Spinner,
   StatCard,
   cn,
 } from '../components/ui'
-import { portalService, type StudentDashboardData } from '../services/portal'
-import { formatTime12, getNextClass, gradeTone, timeToMinutes } from '../lib/format'
+import { portalService, type AvailableOffering, type StudentDashboardData } from '../services/portal'
+import { formatDate, formatTime12, getNextClass, gradeTone, timeToMinutes } from '../lib/format'
 
 type ModalName = 'schedule' | 'progress' | 'finance' | 'procedures' | null
 
 const NAV = [
   { label: 'Inicio', href: '#inicio', icon: LayoutDashboard },
+  { label: 'Matrícula', href: '#matricula', icon: Plus },
   { label: 'Mi horario', href: '#horario', icon: CalendarDays },
   { label: 'Mis materias', href: '#materias', icon: BookOpen },
   { label: 'Notas', href: '#notas', icon: Award },
+  { label: 'Historial', href: '#historial', icon: FileText },
   { label: 'Progreso', href: '#progreso', icon: GraduationCap },
 ]
 
@@ -55,6 +60,10 @@ const DAY_ORDER: Record<string, number> = {
   domingo: 0,
 }
 
+/**
+ * Panel del estudiante: resume matrículas, horario, calificaciones e historial
+ * consumiendo el portal académico del backend.
+ */
 export default function StudentDashboard() {
   const [data, setData] = useState<StudentDashboardData | null>(null)
   const [loading, setLoading] = useState(true)
@@ -62,6 +71,11 @@ export default function StudentDashboard() {
   const [modal, setModal] = useState<ModalName>(null)
   const [hasDebt, setHasDebt] = useState(false)
   const [hasProcedure, setHasProcedure] = useState(true)
+  const [offerings, setOfferings] = useState<AvailableOffering[]>([])
+  const [offeringsLoading, setOfferingsLoading] = useState(true)
+  const [offeringsError, setOfferingsError] = useState('')
+  const [enrollingId, setEnrollingId] = useState<number | null>(null)
+  const [notice, setNotice] = useState<{ tone: 'success' | 'error'; text: string } | null>(null)
 
   const load = useCallback(() => {
     setLoading(true)
@@ -74,7 +88,48 @@ export default function StudentDashboard() {
       .finally(() => setLoading(false))
   }, [])
 
-  useEffect(load, [load])
+  const loadOfferings = useCallback(() => {
+    setOfferingsLoading(true)
+    setOfferingsError('')
+
+    portalService
+      .availableOfferings()
+      .then(setOfferings)
+      .catch((err) =>
+        setOfferingsError(err instanceof Error ? err.message : 'No se pudo cargar la oferta académica'),
+      )
+      .finally(() => setOfferingsLoading(false))
+  }, [])
+
+  useEffect(() => {
+    load()
+    loadOfferings()
+  }, [load, loadOfferings])
+
+  /**
+   * Registra la matrícula del estudiante en una oferta y refresca el panel.
+   * @param offering Oferta seleccionada.
+   */
+  const enroll = async (offering: AvailableOffering) => {
+    setEnrollingId(offering.id)
+    setNotice(null)
+
+    try {
+      await portalService.enroll(offering.id)
+      setNotice({ tone: 'success', text: `Matrícula registrada en ${offering.materia}.` })
+      await Promise.all([
+        portalService.studentDashboard().then(setData),
+        portalService.availableOfferings().then(setOfferings),
+      ])
+    } catch (err) {
+      setNotice({
+        tone: 'error',
+        text: err instanceof Error ? err.message : 'No se pudo registrar la matrícula',
+      })
+    } finally {
+      setEnrollingId(null)
+    }
+  }
 
   if (loading) {
     return (
@@ -176,6 +231,92 @@ export default function StudentDashboard() {
             tone={hasDebt ? 'warning' : 'success'}
           />
         </div>
+
+        <Card id="matricula">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <SectionTitle icon={ClipboardList} label="Matrícula académica" />
+            <Badge tone="neutral">{offerings.filter((offering) => !offering.matriculado).length} ofertas disponibles</Badge>
+          </div>
+
+          {notice && (
+            <div className="mt-4">
+              <Notice tone={notice.tone} onClose={() => setNotice(null)}>
+                {notice.tone === 'success' ? (
+                  <CheckCircle2 className="h-4 w-4" />
+                ) : (
+                  <AlertTriangle className="h-4 w-4" />
+                )}
+                {notice.text}
+              </Notice>
+            </div>
+          )}
+
+          {offeringsLoading ? (
+            <div className="mt-4">
+              <Spinner label="Cargando oferta académica..." />
+            </div>
+          ) : offeringsError ? (
+            <div className="mt-4">
+              <ErrorPanel message={offeringsError} onRetry={loadOfferings} />
+            </div>
+          ) : offerings.length === 0 ? (
+            <div className="mt-4">
+              <EmptyState
+                icon={BookOpen}
+                title="Sin ofertas disponibles"
+                description="No hay materias abiertas para matrícula en el periodo activo."
+              />
+            </div>
+          ) : (
+            <div className="mt-4 overflow-x-auto">
+              <table className="w-full min-w-[760px] text-left text-sm">
+                <thead>
+                  <tr className="border-b border-slate-200 text-[11px] uppercase tracking-wide text-slate-400 dark:border-slate-800">
+                    <th className="pb-2 font-bold">Materia</th>
+                    <th className="pb-2 font-bold">Profesor</th>
+                    <th className="pb-2 font-bold">Horario</th>
+                    <th className="pb-2 font-bold">Cupos</th>
+                    <th className="pb-2 text-right font-bold">Acción</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                  {offerings.map((offering) => {
+                    const full = offering.cupo > 0 && offering.estudiantes >= offering.cupo
+
+                    return (
+                      <tr key={offering.id}>
+                        <td className="py-3 pr-4">
+                          <p className="font-bold text-slate-900 dark:text-white">{offering.materia}</p>
+                          <p className="text-xs text-slate-400">
+                            {offering.codigo} · Grupo {offering.grupo} · {offering.creditos} créditos
+                          </p>
+                        </td>
+                        <td className="py-3 pr-4 text-slate-600 dark:text-slate-300">{offering.profesor}</td>
+                        <td className="py-3 pr-4 text-xs text-slate-500 dark:text-slate-400">
+                          {offering.horario || 'Sin horario'}
+                        </td>
+                        <td className="py-3 pr-4 text-xs font-semibold text-slate-600 dark:text-slate-300">
+                          {offering.estudiantes} / {offering.cupo}
+                        </td>
+                        <td className="py-3 text-right">
+                          <Button
+                            onClick={() => enroll(offering)}
+                            disabled={offering.matriculado || full || enrollingId === offering.id}
+                            loading={enrollingId === offering.id}
+                            variant={offering.matriculado ? 'ghost' : 'brand'}
+                            className="ml-auto"
+                          >
+                            {offering.matriculado ? 'Matriculado' : full ? 'Sin cupo' : 'Matricularme'}
+                          </Button>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </Card>
 
         <div className="grid gap-4 lg:grid-cols-12">
           <Card id="horario" className="lg:col-span-5">
@@ -442,6 +583,7 @@ export default function StudentDashboard() {
                     <p className="truncate text-sm font-bold text-slate-900 dark:text-white">{grade.materia}</p>
                     <p className="text-xs text-slate-400">
                       {grade.codigo} · {grade.creditos} créditos · {grade.evaluaciones} evaluación(es)
+                      {grade.fechaRegistro ? ` · ${formatDate(grade.fechaRegistro)}` : ''}
                     </p>
                   </div>
                   <Badge tone={gradeTone(grade.nota)} className="shrink-0 text-sm">
@@ -449,6 +591,57 @@ export default function StudentDashboard() {
                   </Badge>
                 </div>
               ))}
+            </div>
+          )}
+        </Card>
+
+        <Card id="historial">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <SectionTitle icon={FileText} label="Historial académico" />
+            <Badge tone="neutral">{grades.length} materias con registro</Badge>
+          </div>
+
+          {grades.length === 0 ? (
+            <div className="mt-4">
+              <EmptyState
+                icon={FileText}
+                title="Sin historial de calificaciones"
+                description="El historial se construye con cada evaluación registrada por tus profesores."
+              />
+            </div>
+          ) : (
+            <div className="mt-4 overflow-x-auto">
+              <table className="w-full min-w-[620px] text-left text-sm">
+                <thead>
+                  <tr className="border-b border-slate-200 text-[11px] uppercase tracking-wide text-slate-400 dark:border-slate-800">
+                    <th className="pb-2 font-bold">Materia</th>
+                    <th className="pb-2 font-bold">Créditos</th>
+                    <th className="pb-2 font-bold">Evaluaciones</th>
+                    <th className="pb-2 font-bold">Último registro</th>
+                    <th className="pb-2 font-bold">Nota</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                  {grades.map((grade) => (
+                    <tr key={`history-${grade.materiaId}`}>
+                      <td className="py-3 pr-4">
+                        <p className="font-semibold text-slate-900 dark:text-white">{grade.materia}</p>
+                        <p className="text-xs text-slate-400">{grade.codigo}</p>
+                      </td>
+                      <td className="py-3 pr-4 text-slate-600 dark:text-slate-300">{grade.creditos}</td>
+                      <td className="py-3 pr-4 text-slate-600 dark:text-slate-300">{grade.evaluaciones}</td>
+                      <td className="py-3 pr-4 text-xs text-slate-500 dark:text-slate-400">
+                        {formatDate(grade.fechaRegistro)}
+                      </td>
+                      <td className="py-3">
+                        <Badge tone={gradeTone(grade.nota)}>
+                          {grade.nota !== null ? grade.nota.toFixed(2) : 'Sin nota'}
+                        </Badge>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
         </Card>

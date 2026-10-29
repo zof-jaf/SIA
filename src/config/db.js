@@ -1,11 +1,17 @@
-require('dotenv').config();
+require('./env');
 const { Pool } = require('pg');
+
+if (!process.env.DATABASE_URL) {
+  throw new Error('DATABASE_URL no está configurada. Define la conexión en el archivo .env.');
+}
+
+const sslEnabled = process.env.DB_SSL !== 'false';
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: {
-    rejectUnauthorized: false 
-  }
+  ssl: sslEnabled
+    ? { rejectUnauthorized: process.env.DB_SSL_REJECT_UNAUTHORIZED !== 'false' }
+    : false
 });
 
 pool.query('SELECT NOW()', (err, res) => {

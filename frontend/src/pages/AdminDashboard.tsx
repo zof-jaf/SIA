@@ -1,13 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
-  BarChart3,
   BookOpen,
   Building2,
   CalendarRange,
   CheckCircle2,
-  ClipboardList,
   GraduationCap,
   LayoutDashboard,
+  Plus,
   Search,
   ShieldCheck,
   UserCheck,
@@ -16,17 +15,14 @@ import {
   Users,
 } from 'lucide-react'
 import Layout from '../components/Layout'
+import { ProgramForm, SubjectForm, UserForm, type UserKind } from '../components/AdminForms'
 import {
-  ActionRow,
   Badge,
   Button,
   Card,
   EmptyState,
   ErrorPanel,
-  FormCard,
-  Input,
-  Label,
-  Select,
+  Notice,
   SectionHead,
   Spinner,
   StatCard,
@@ -64,12 +60,20 @@ const TAB_TITLES: Record<Tab, { title: string; subtitle: string }> = {
   oferta: { title: 'Oferta académica', subtitle: 'Cursos abiertos y su ocupación' },
 }
 
+/**
+ * Devuelve el tono visual usado para representar cada rol.
+ * @param rol Nombre del rol.
+ */
 const roleTone = (rol: string) => {
   if (rol === 'ADMINISTRADOR') return 'brand' as const
   if (rol === 'PROFESOR') return 'warning' as const
   return 'success' as const
 }
 
+/**
+ * Panel de administración. Reutiliza el layout común y concentra usuarios,
+ * catálogo y oferta académica en pestañas con navegación por hash.
+ */
 export default function AdminDashboard() {
   const [data, setData] = useState<AdminDashboardData | null>(null)
   const [students, setStudents] = useState<AdminUser[]>([])
@@ -88,9 +92,8 @@ export default function AdminDashboard() {
   const [query, setQuery] = useState('')
   const [updatingId, setUpdatingId] = useState<number | null>(null)
   const [notice, setNotice] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
-
-  // Creation forms state
-  const [creatingUser, setCreatingUser] = useState<'estudiante' | 'profesor' | 'administrador' | null>(null)
+  const [saving, setSaving] = useState(false)
+  const [creatingUser, setCreatingUser] = useState<UserKind | null>(null)
   const [creatingProgram, setCreatingProgram] = useState(false)
   const [creatingSubject, setCreatingSubject] = useState(false)
 
@@ -184,6 +187,7 @@ export default function AdminDashboard() {
 
   const createUser = async (input: CreateStudentInput | CreateProfessorInput | CreateAdminInput) => {
     setNotice(null)
+    setSaving(true)
 
     try {
       if (creatingUser === 'estudiante') {
@@ -202,11 +206,14 @@ export default function AdminDashboard() {
         type: 'error',
         text: err instanceof Error ? err.message : 'No se pudo crear el usuario',
       })
+    } finally {
+      setSaving(false)
     }
   }
 
   const createProgram = async (input: CreateProgramInput) => {
     setNotice(null)
+    setSaving(true)
 
     try {
       await portalService.createProgram(input)
@@ -218,11 +225,14 @@ export default function AdminDashboard() {
         type: 'error',
         text: err instanceof Error ? err.message : 'No se pudo crear el programa',
       })
+    } finally {
+      setSaving(false)
     }
   }
 
   const createSubject = async (input: CreateSubjectInput) => {
     setNotice(null)
+    setSaving(true)
 
     try {
       await portalService.createSubject(input)
@@ -234,6 +244,8 @@ export default function AdminDashboard() {
         type: 'error',
         text: err instanceof Error ? err.message : 'No se pudo crear la materia',
       })
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -259,22 +271,14 @@ export default function AdminDashboard() {
     <Layout title={heading.title} subtitle={heading.subtitle} nav={NAV}>
       <div className="space-y-6">
         {notice && (
-          <div
-            className={cn(
-              'flex items-center justify-between gap-3 rounded-lg border px-4 py-3 text-sm font-semibold',
-              notice.type === 'success'
-                ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300'
-                : 'border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-300',
+          <Notice tone={notice.type} onClose={() => setNotice(null)}>
+            {notice.type === 'success' ? (
+              <CheckCircle2 className="h-4 w-4" />
+            ) : (
+              <ShieldCheck className="h-4 w-4" />
             )}
-          >
-            <span className="flex items-center gap-2">
-              {notice.type === 'success' ? <CheckCircle2 className="h-4 w-4" /> : <ShieldCheck className="h-4 w-4" />}
-              {notice.text}
-            </span>
-            <button onClick={() => setNotice(null)} className="text-xs underline">
-              Cerrar
-            </button>
-          </div>
+            {notice.text}
+          </Notice>
         )}
 
         {tab === 'resumen' && (
@@ -444,108 +448,13 @@ export default function AdminDashboard() {
             </div>
 
             {creatingUser && (
-              <FormCard
-                title={`Crear ${creatingUser === 'estudiante' ? 'estudiante' : creatingUser === 'profesor' ? 'profesor' : 'administrador'}`}
-                subtitle="Rellena los datos del nuevo usuario"
-              >
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <Input
-                    label="Nombres"
-                    placeholder="Nombres"
-                    required
-                  />
-                  <Input
-                    label="Apellidos"
-                    placeholder="Apellidos"
-                    required
-                  />
-                  <Input
-                    label="Correo institucional"
-                    type="email"
-                    placeholder="usuario@ucaldas.edu.co"
-                    required
-                  />
-                  <Input
-                    label="Contraseña"
-                    type="password"
-                    placeholder="••••••••"
-                    required
-                  />
-                  {creatingUser === 'estudiante' && (
-                    <>
-                      <Select
-                        label="Programa académico"
-                        placeholder="Seleccionar programa"
-                        required
-                      >
-                        {programs.map((p) => (
-                          <option key={p.id} value={String(p.id)}>
-                            {p.codigo} - {p.nombre}
-                          </option>
-                        ))}
-                      </Select>
-                      <Input
-                        label="Documento"
-                        placeholder="Número de documento"
-                      />
-                    </>
-                  )}
-                  {creatingUser === 'profesor' && (
-                    <>
-                      <Input
-                        label="Especialidad"
-                        placeholder="Ej. Ingeniería de Software y BD"
-                      />
-                      <Input
-                        label="Documento"
-                        placeholder="Número de documento"
-                      />
-                    </>
-                  )}
-                  {creatingUser === 'administrador' && (
-                    <>
-                      <Input
-                        label="Cargo"
-                        placeholder="Ej. Decano, Coordinador, Rector"
-                      />
-                    </>
-                  )}
-                  <div className="col-span-2">
-                    <Label>Estado</Label>
-                    <Select
-                      label="Estado"
-                      value="true"
-                      onChange={() => {}}
-                      disabled
-                    >
-                      <option value="true">Activo</option>
-                      <option value="false">Inactivo</option>
-                    </Select>
-                  </div>
-                </div>
-
-                <ActionRow>
-                  <Button
-                    onClick={() => setCreatingUser(null)}
-                    variant="ghost"
-                  >
-                    Cancelar
-                  </Button>
-                  <Button
-                    onClick={() => {
-                      // Minimal mock creation using first form values
-                      // In a real app, you'd collect form state with react-hook-form or useState
-                      setNotice({
-                        type: 'error',
-                        text: 'Conecta un formulario controlado para crear el usuario.',
-                      })
-                    }}
-                    variant="brand"
-                  >
-                    Crear usuario
-                  </Button>
-                </ActionRow>
-              </FormCard>
+              <UserForm
+                kind={creatingUser}
+                programs={programs}
+                submitting={saving}
+                onCancel={() => setCreatingUser(null)}
+                onSubmit={createUser}
+              />
             )}
 
             <div className="mt-4 overflow-x-auto">
@@ -626,8 +535,32 @@ export default function AdminDashboard() {
               <StatCard icon={CalendarRange} label="Periodos" value={periods.length} hint={`${periods.filter((p) => p.activo).length} activo(s)`} />
             </div>
 
+            {creatingProgram && (
+              <ProgramForm
+                submitting={saving}
+                onCancel={() => setCreatingProgram(false)}
+                onSubmit={createProgram}
+              />
+            )}
+
+            {creatingSubject && (
+              <SubjectForm
+                submitting={saving}
+                onCancel={() => setCreatingSubject(false)}
+                onSubmit={createSubject}
+              />
+            )}
+
             <Card>
-              <SectionHead label="Programas académicos" icon={Building2} />
+              <SectionHead
+                label="Programas académicos"
+                icon={Building2}
+                action={
+                  <Button onClick={() => setCreatingProgram(true)} variant="outline">
+                    <Plus className="h-3.5 w-3.5" /> Nuevo programa
+                  </Button>
+                }
+              />
               <div className="mt-3 overflow-x-auto">
                 <table className="w-full min-w-[600px] text-left text-sm">
                   <thead>
@@ -663,7 +596,15 @@ export default function AdminDashboard() {
 
             <div className="grid gap-4 lg:grid-cols-2">
               <Card>
-                <SectionHead label="Materias" icon={BookOpen} />
+                <SectionHead
+                  label="Materias"
+                  icon={BookOpen}
+                  action={
+                    <Button onClick={() => setCreatingSubject(true)} variant="outline">
+                      <Plus className="h-3.5 w-3.5" /> Nueva materia
+                    </Button>
+                  }
+                />
                 <div className="mt-3 space-y-2">
                   {subjects.map((subject) => (
                     <div

@@ -1,18 +1,29 @@
 const portalRepository = require('../repositories/portalRepository');
+const { normalizeRole } = require('../utils/roles');
 
+/**
+ * Convierte un valor numérico opcional conservando `null` para datos ausentes.
+ * @param {unknown} value Valor original.
+ * @returns {number | null} Número válido o `null`.
+ */
 const toNumber = (value) => {
   if (value === null || value === undefined) return null;
   const parsed = Number(value);
   return Number.isNaN(parsed) ? null : parsed;
 };
 
+/**
+ * Normaliza el perfil devuelto por el portal para el frontend.
+ * @param {object} profile Fila de perfil.
+ * @returns {object} Perfil público.
+ */
 const shapeProfile = (profile) => ({
   id: profile.id,
   nombre: profile.nombre,
   apellido: profile.apellido,
   nombreCompleto: `${profile.nombre || ''} ${profile.apellido || ''}`.trim(),
   email: profile.email,
-  rol: profile.rol,
+  rol: normalizeRole(profile.rol) || profile.rol,
   activo: profile.activo,
   documento: profile.documento || null,
   programa: profile.programa || null,
@@ -33,12 +44,22 @@ const pickEnrollment = (current, incoming) => {
 };
 
 class PortalService {
+  /**
+   * Obtiene el perfil del usuario autenticado.
+   * @param {number|string} userId Identificador del usuario.
+   * @returns {Promise<object>} Perfil público.
+   */
   async getMe(userId) {
     const profile = await portalRepository.getUserProfile(userId);
     if (!profile) throw new Error('Usuario no encontrado.');
     return shapeProfile(profile);
   }
 
+  /**
+   * Construye el panel del estudiante con matrículas, horario, notas y avance.
+   * @param {number|string} userId Identificador del usuario.
+   * @returns {Promise<object>} Datos consolidados del estudiante.
+   */
   async getStudentDashboard(userId) {
     const profile = await portalRepository.getUserProfile(userId);
 
@@ -158,6 +179,11 @@ class PortalService {
     };
   }
 
+  /**
+   * Construye el panel del profesor con sus ofertas y estadísticas.
+   * @param {number|string} userId Identificador del usuario.
+   * @returns {Promise<object>} Datos consolidados del profesor.
+   */
   async getProfessorDashboard(userId) {
     const profile = await portalRepository.getUserProfile(userId);
 
@@ -206,6 +232,12 @@ class PortalService {
     };
   }
 
+  /**
+   * Lista estudiantes de una oferta validando que pertenezca al profesor.
+   * @param {number|string} userId Identificador del usuario.
+   * @param {number|string} offeringId Identificador de la oferta.
+   * @returns {Promise<object[]>} Estudiantes matriculados.
+   */
   async getOfferingStudents(userId, offeringId) {
     const profile = await portalRepository.getUserProfile(userId);
     if (!profile || !profile.profesor_id) {
@@ -229,6 +261,10 @@ class PortalService {
     }));
   }
 
+  /**
+   * Construye el panel administrativo con estadísticas y catálogo.
+   * @returns {Promise<object>} Datos consolidados del sistema.
+   */
   async getAdminDashboard() {
     const [stats, recentUsers, offerings, programStats, period] = await Promise.all([
       portalRepository.getAdminStats(),

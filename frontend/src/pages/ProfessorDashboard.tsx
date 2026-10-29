@@ -20,10 +20,10 @@ import {
   Input,
   Label,
   Modal,
+  Notice,
   SectionHead,
   Spinner,
   StatCard,
-  cn,
 } from '../components/ui'
 import {
   portalService,
@@ -33,6 +33,7 @@ import {
 import { gradeTone } from '../lib/format'
 
 const NAV = [
+  { label: 'Resumen', href: '#resumen', icon: LayoutDashboard },
   { label: 'Mis cursos', href: '#cursos', icon: BookOpen },
 ]
 
@@ -41,6 +42,10 @@ interface GradeDraft {
   observaciones: string
 }
 
+/**
+ * Panel del profesor: muestra sus cursos, estudiantes matriculados y permite
+ * registrar calificaciones únicamente sobre ofertas asignadas a su perfil.
+ */
 export default function ProfessorDashboard() {
   const [data, setData] = useState<ProfessorDashboardData | null>(null)
   const [loading, setLoading] = useState(true)
@@ -172,6 +177,26 @@ export default function ProfessorDashboard() {
       nav={NAV}
     >
       <div className="space-y-6">
+        <Card id="resumen" className="relative overflow-hidden border-brand/20 bg-gradient-to-br from-white via-white to-sky-50 dark:border-brand/20 dark:from-[#181b20] dark:via-[#181b20] dark:to-[#13232d]">
+          <div className="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full bg-brand/10 blur-2xl" />
+          <div className="relative">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge tone="brand">
+                <GraduationCap className="h-3.5 w-3.5" /> Profesor
+              </Badge>
+              {period && <Badge tone="success">Periodo {period.nombre}</Badge>}
+            </div>
+            <h2 className="mt-3 text-2xl font-extrabold text-slate-900 sm:text-3xl dark:text-white">
+              Hola, {profile.nombre}
+            </h2>
+            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+              Gestiona tus cursos, revisa a tus estudiantes y registra sus calificaciones.
+            </p>
+          </div>
+        </Card>
+
+        <StatsRow stats={stats} />
+
         <Card id="cursos">
           <SectionHead label="Cursos asignados" icon={BookOpen} />
 
@@ -233,8 +258,6 @@ export default function ProfessorDashboard() {
             </div>
           )}
         </Card>
-
-        <StatsRow stats={stats} />
       </div>
 
       <Modal
@@ -261,16 +284,11 @@ export default function ProfessorDashboard() {
         ) : (
           <>
             {notice && (
-              <div
-                className={cn(
-                  'mb-4 flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-semibold',
-                  notice.type === 'success'
-                    ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300'
-                    : 'border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-300',
-                )}
-              >
-                {notice.type === 'success' ? <ClipboardList className="h-4 w-4" /> : <Mail className="h-4 w-4" />}
-                {notice.text}
+              <div className="mb-4">
+                <Notice tone={notice.type} onClose={() => setNotice(null)}>
+                  {notice.type === 'success' ? <ClipboardList className="h-4 w-4" /> : <Mail className="h-4 w-4" />}
+                  {notice.text}
+                </Notice>
               </div>
             )}
 
@@ -282,19 +300,19 @@ export default function ProfessorDashboard() {
                 return (
                   <Card
                     key={student.matriculaId}
-                    className="flex items-center justify-between gap-4 p-4"
+                    className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between"
                   >
                     <div className="min-w-0 flex-1">
                       <p className="font-bold text-slate-900 dark:text-white">
                         {student.nombreCompleto}
                       </p>
-                      <p className="text-xs text-slate-500 dark:text-slate-400">
+                      <p className="break-words text-xs text-slate-500 dark:text-slate-400">
                         {student.email} · Doc. {student.documento}
                       </p>
                     </div>
 
-                    <div className="flex items-center gap-3 flex-shrink-0">
-                      <div className="w-24">
+                    <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-end">
+                      <div className="w-full sm:w-24">
                         <Label className="text-[10px]">Nota (0-5)</Label>
                         <Input
                           type="number"
@@ -309,7 +327,7 @@ export default function ProfessorDashboard() {
                         />
                       </div>
 
-                      <div className="flex-1 min-w-0">
+                      <div className="w-full sm:w-56">
                         <Label className="text-[10px]">Observaciones</Label>
                         <Input
                           type="text"
@@ -326,13 +344,14 @@ export default function ProfessorDashboard() {
                         disabled={saving}
                         loading={saving}
                         variant="brand"
+                        className="w-full sm:w-auto"
                       >
                         <Save className="h-3.5 w-3.5" />
                         {saving ? 'Guardando' : 'Guardar'}
                       </Button>
                     </div>
 
-                    <Badge tone={gradeTone(student.nota)}>
+                    <Badge tone={gradeTone(student.nota)} className="self-start sm:self-auto">
                       {student.nota !== null ? `Nota ${student.nota.toFixed(2)}` : 'Sin nota'}
                     </Badge>
                   </Card>

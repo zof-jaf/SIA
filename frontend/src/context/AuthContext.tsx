@@ -11,6 +11,11 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | null>(null)
 
+/**
+ * Provider encargado de restaurar la sesión desde la cookie httpOnly y exponer
+ * las operaciones de autenticación a toda la aplicación.
+ * @param props Componentes hijos de la aplicación.
+ */
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
@@ -62,6 +67,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
 
+/**
+ * Hook de acceso al contexto de autenticación.
+ * @returns Usuario, estado de carga y acciones de sesión.
+ */
 export function useAuth() {
   const context = useContext(AuthContext)
   if (!context) throw new Error('useAuth debe usarse dentro de AuthProvider')
