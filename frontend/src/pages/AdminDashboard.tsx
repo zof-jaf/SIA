@@ -1,12 +1,14 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
 import {
   BookOpen,
   Building2,
   CalendarRange,
   CheckCircle2,
+  ClipboardList,
   GraduationCap,
   LayoutDashboard,
   Plus,
+  Save,
   Search,
   ShieldCheck,
   UserCheck,
@@ -15,15 +17,18 @@ import {
   Users,
 } from 'lucide-react'
 import Layout from '../components/Layout'
-import { ProgramForm, SubjectForm, UserForm, type UserKind } from '../components/AdminForms'
+import { OfferingForm, ProgramForm, SubjectForm, UserForm, type UserKind } from '../components/AdminForms'
 import {
   Badge,
   Button,
   Card,
   EmptyState,
   ErrorPanel,
+  Input,
+  Modal,
   Notice,
   SectionHead,
+  Select,
   Spinner,
   StatCard,
   cn,
@@ -31,17 +36,20 @@ import {
 import {
   portalService,
   type AdminDashboardData,
+  type AdminOffering,
   type AdminPeriod,
   type AdminUser,
   type CreateAdminInput,
+  type CreateOfferingInput,
   type CreateProfessorInput,
   type CreateProgramInput,
   type CreateStudentInput,
   type CreateSubjectInput,
+  type OfferingStudent,
   type Program,
   type Subject,
 } from '../services/portal'
-import { formatDate } from '../lib/format'
+import { formatDate, gradeTone } from '../lib/format'
 
 type Tab = 'resumen' | 'usuarios' | 'catalogo' | 'oferta'
 type UserTab = 'estudiantes' | 'profesores'
@@ -57,7 +65,7 @@ const TAB_TITLES: Record<Tab, { title: string; subtitle: string }> = {
   resumen: { title: 'Resumen general', subtitle: 'Indicadores del sistema académico' },
   usuarios: { title: 'Gestión de usuarios', subtitle: 'Estudiantes, profesores y administradores' },
   catalogo: { title: 'Catálogo académico', subtitle: 'Programas y materias' },
-  oferta: { title: 'Oferta académica', subtitle: 'Cursos abiertos y su ocupación' },
+  oferta: { title: 'Oferta académica', subtitle: 'Materias asignadas, matrículas y calificaciones' },
 }
 
 /**
@@ -96,6 +104,16 @@ export default function AdminDashboard() {
   const [creatingUser, setCreatingUser] = useState<UserKind | null>(null)
   const [creatingProgram, setCreatingProgram] = useState(false)
   const [creatingSubject, setCreatingSubject] = useState(false)
+  const [creatingOffering, setCreatingOffering] = useState(false)
+  const [selectedOfferingId, setSelectedOfferingId] = useState<number | null>(null)
+  const [offeringStudents, setOfferingStudents] = useState<OfferingStudent[]>([])
+  const [offeringStudentsLoading, setOfferingStudentsLoading] = useState(false)
+  const [offeringStudentsError, setOfferingStudentsError] = useState('')
+  const [gradeDrafts, setGradeDrafts] = useState<Record<number, { nota: string; observaciones: string }>>({})
+  const [savingGradeId, setSavingGradeId] = useState<number | null>(null)
+  const [enrollStudentId, setEnrollStudentId] = useState('')
+  const [enrollOfferingId, setEnrollOfferingId] = useState('')
+  const [enrolling, setEnrolling] = useState(false)
 
   const load = useCallback(() => {
     setLoading(true)
@@ -144,6 +162,19 @@ export default function AdminDashboard() {
         .includes(term),
     )
   }, [currentUsers, query])
+
+  const selectedOffering = useMemo(
+    () => data?.offerings.find((offering) => offering.id === selectedOfferingId) ?? null,
+    [data, selectedOfferingId],
+  )
+
+  const activeOfferings = useMemo(
+    () =>
+      (data?.offerings || []).filter(
+        (offering) => offering.periodoActivo && offering.estado !== 'CERRADA',
+      ),
+    [data],
+  )
 
   const toggleStatus = async (user: AdminUser) => {
     setUpdatingId(user.usuario_id)
@@ -235,10 +266,40 @@ export default function AdminDashboard() {
     setSaving(true)
 
     try {
-      await portalService.createSubject(input)
+      const subject = await portalService.createSubject(input)
+
+      if (input.profesor_id && input.periodo_id) {
+        try {
+          await portalService.createOffering({
+            materia_id: subject.id,
+            profesor_id: input.profesor_id,
+            periodo_id: input.periodo_id,
+            grupo: input.grupo,
+            cupo: input.cupo,
+            estado: 'ABIERTA',
+          })
+        } catch (assignmentError) {
+          setCreatingSubject(false)
+          load()
+          setNotice({
+            type: 'error',
+            text: `La materia se creó, pero no se pudo asignar al profesor: ${
+              assignmentError instanceof Error ? assignmentError.message : 'error desconocido'
+            }`,
+          })
+          return
+        }
+      }
+
       setCreatingSubject(false)
       load()
-      setNotice({ type: 'success', text: 'Materia creada correctamente.' })
+      setNotice({
+        type: 'success',
+        text:
+          input.profesor_id && input.periodo_id
+            ? 'Materia creada y asignada al profesor correctamente.'
+            : 'Materia creada correctamente.',
+      })
     } catch (err) {
       setNotice({
         type: 'error',
@@ -246,6 +307,116 @@ export default function AdminDashboard() {
       })
     } finally {
       setSaving(false)
+    }
+  }
+
+  const createOffering = async (input: CreateOfferingInput) => {
+    setNotice(null)
+    setSaving(true)
+
+    try {
+      await portalService.createOffering(input)
+      setCreatingOffering(false)
+      load()
+      setNotice({ type: 'success', text: 'Materia asignada al profesor correctamente.' })
+    } catch (err) {
+      setNotice({
+        type: 'error',
+        text: err instanceof Error ? err.message : 'No se pudo asignar la materia',
+      })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const openOffering = async (offering: AdminOffering) => {
+    setSelectedOfferingId(offering.id)
+    setOfferingStudents([])
+    setOfferingStudentsError('')
+    setOfferingStudentsLoading(true)
+    setNotice(null)
+
+    try {
+      const students = await portalService.adminOfferingStudents(offering.id)
+      setOfferingStudents(students)
+      setGradeDrafts(
+        Object.fromEntries(
+          students.map((student) => [
+            student.matriculaId,
+            {
+              nota: student.nota !== null ? String(student.nota) : '',
+              observaciones: student.observaciones || '',
+            },
+          ]),
+        ),
+      )
+    } catch (err) {
+      setOfferingStudentsError(
+        err instanceof Error ? err.message : 'No se pudieron cargar los estudiantes',
+      )
+    } finally {
+      setOfferingStudentsLoading(false)
+    }
+  }
+
+  const closeOffering = () => {
+    setSelectedOfferingId(null)
+    setOfferingStudents([])
+    setGradeDrafts({})
+    setOfferingStudentsError('')
+    setNotice(null)
+  }
+
+  const saveGrade = async (student: OfferingStudent) => {
+    const draft = gradeDrafts[student.matriculaId] || { nota: '', observaciones: '' }
+    const nota = Number(draft.nota)
+
+    if (!draft.nota || Number.isNaN(nota) || nota < 0 || nota > 5) {
+      setNotice({ type: 'error', text: 'La nota debe estar entre 0.0 y 5.0.' })
+      return
+    }
+
+    setSavingGradeId(student.matriculaId)
+    setNotice(null)
+
+    try {
+      await portalService.saveGrade(student.matriculaId, nota, draft.observaciones)
+      setOfferingStudents((current) =>
+        current.map((item) =>
+          item.matriculaId === student.matriculaId
+            ? { ...item, nota, observaciones: draft.observaciones }
+            : item,
+        ),
+      )
+      setNotice({ type: 'success', text: `Nota registrada para ${student.nombreCompleto}.` })
+    } catch (err) {
+      setNotice({
+        type: 'error',
+        text: err instanceof Error ? err.message : 'No se pudo registrar la calificación',
+      })
+    } finally {
+      setSavingGradeId(null)
+    }
+  }
+
+  const enrollStudent = async (event: FormEvent) => {
+    event.preventDefault()
+    setNotice(null)
+    setEnrolling(true)
+
+    try {
+      await portalService.enrollStudent(Number(enrollStudentId), Number(enrollOfferingId))
+      setNotice({ type: 'success', text: 'Estudiante matriculado correctamente.' })
+      setEnrollStudentId('')
+      setEnrollOfferingId('')
+      load()
+    } catch (err) {
+      setNotice({
+        type: 'error',
+        text: err instanceof Error ? err.message : 'No se pudo matricular al estudiante',
+      })
+    } finally {
+      setEnrolling(false)
     }
   }
 
@@ -545,6 +716,8 @@ export default function AdminDashboard() {
 
             {creatingSubject && (
               <SubjectForm
+                professors={professors}
+                periods={periods}
                 submitting={saving}
                 onCancel={() => setCreatingSubject(false)}
                 onSubmit={createSubject}
@@ -606,18 +779,31 @@ export default function AdminDashboard() {
                   }
                 />
                 <div className="mt-3 space-y-2">
-                  {subjects.map((subject) => (
-                    <div
-                      key={subject.id}
-                      className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 px-3 py-2 dark:border-slate-800"
-                    >
-                      <div>
-                        <p className="text-sm font-semibold text-slate-900 dark:text-white">{subject.nombre}</p>
-                        <p className="text-[11px] text-slate-400">{subject.codigo}</p>
+                  {subjects.map((subject) => {
+                    const assignments = data.offerings.filter(
+                      (offering) => offering.materiaId === subject.id,
+                    )
+
+                    return (
+                      <div
+                        key={subject.id}
+                        className="flex items-start justify-between gap-3 rounded-lg border border-slate-200 px-3 py-2 dark:border-slate-800"
+                      >
+                        <div>
+                          <p className="text-sm font-semibold text-slate-900 dark:text-white">{subject.nombre}</p>
+                          <p className="text-[11px] text-slate-400">{subject.codigo}</p>
+                          <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
+                            {assignments.length > 0
+                              ? assignments
+                                  .map((offering) => `${offering.profesor} · G${offering.grupo} · ${offering.periodo}`)
+                                  .join(' | ')
+                              : 'Sin profesor asignado'}
+                          </p>
+                        </div>
+                        <Badge tone="brand">{subject.creditos} créditos</Badge>
                       </div>
-                      <Badge tone="brand">{subject.creditos} créditos</Badge>
-                    </div>
-                  ))}
+                    )
+                  })}
                   {subjects.length === 0 && <EmptyState icon={BookOpen} title="Sin materias registradas" />}
                 </div>
               </Card>
@@ -649,50 +835,259 @@ export default function AdminDashboard() {
         )}
 
         {tab === 'oferta' && (
-          <Card>
-            <SectionHead label="Oferta académica" icon={CalendarRange} />
-            <div className="mt-3 overflow-x-auto">
-              {data.offerings.length === 0 ? (
-                <EmptyState icon={CalendarRange} title="Sin ofertas registradas" />
-              ) : (
-                <table className="w-full min-w-[760px] text-left text-sm">
-                  <thead>
-                    <tr className="border-b border-slate-200 text-[10px] uppercase tracking-wide text-slate-400 dark:border-slate-800">
-                      <th className="pb-2 font-bold">Materia</th>
-                      <th className="pb-2 font-bold">Profesor</th>
-                      <th className="pb-2 font-bold">Periodo</th>
-                      <th className="pb-2 font-bold">Grupo</th>
-                      <th className="pb-2 font-bold">Ocupación</th>
-                      <th className="pb-2 font-bold">Estado</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                    {data.offerings.map((offering) => (
-                      <tr key={offering.id}>
-                        <td className="py-2.5 pr-3">
-                          <p className="font-semibold text-slate-900 dark:text-white">{offering.materia}</p>
-                          <p className="text-[11px] text-slate-400">{offering.codigo}</p>
-                        </td>
-                        <td className="py-2.5 pr-3 text-xs text-slate-600 dark:text-slate-300">{offering.profesor}</td>
-                        <td className="py-2.5 pr-3 text-xs text-slate-500 dark:text-slate-400">{offering.periodo}</td>
-                        <td className="py-2.5 pr-3 text-xs text-slate-500 dark:text-slate-400">{offering.grupo}</td>
-                        <td className="py-2.5 pr-3 text-xs font-semibold text-slate-600 dark:text-slate-300">
-                          {offering.estudiantes} / {offering.cupo}
-                        </td>
-                        <td className="py-2.5">
-                          <Badge tone={offering.estado === 'ABIERTA' ? 'success' : 'neutral'}>
-                            {offering.estado}
-                          </Badge>
-                        </td>
-                      </tr>
+          <div className="space-y-5">
+            {creatingOffering && (
+              <OfferingForm
+                subjects={subjects}
+                professors={professors}
+                periods={periods}
+                submitting={saving}
+                onCancel={() => setCreatingOffering(false)}
+                onSubmit={createOffering}
+              />
+            )}
+
+            <Card>
+              <SectionHead label="Matricular estudiante" icon={UserPlus} />
+              <form
+                onSubmit={enrollStudent}
+                className="mt-3 grid gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end"
+              >
+                <Select
+                  label="Estudiante"
+                  value={enrollStudentId}
+                  onChange={(event) => setEnrollStudentId(event.target.value)}
+                  placeholder="Seleccionar estudiante"
+                  required
+                >
+                  {students
+                    .filter((student) => student.activo)
+                    .map((student) => (
+                      <option key={student.estudiante_id} value={String(student.estudiante_id)}>
+                        {student.nombre} {student.apellido} · {student.email}
+                      </option>
                     ))}
-                  </tbody>
-                </table>
-              )}
-            </div>
-          </Card>
+                </Select>
+                <Select
+                  label="Materia asignada"
+                  value={enrollOfferingId}
+                  onChange={(event) => setEnrollOfferingId(event.target.value)}
+                  placeholder="Seleccionar materia"
+                  required
+                >
+                  {activeOfferings.map((offering) => (
+                    <option key={offering.id} value={String(offering.id)}>
+                      {offering.materia} · {offering.grupo} · {offering.profesor}
+                    </option>
+                  ))}
+                </Select>
+                <Button
+                  type="submit"
+                  variant="brand"
+                  loading={enrolling}
+                  disabled={!enrollStudentId || !enrollOfferingId}
+                  className="w-full sm:w-auto"
+                >
+                  <UserPlus className="h-3.5 w-3.5" /> Matricular
+                </Button>
+              </form>
+            </Card>
+
+            <Card>
+              <SectionHead
+                label="Materias asignadas"
+                icon={CalendarRange}
+                action={
+                  <Button onClick={() => setCreatingOffering(true)} variant="outline">
+                    <Plus className="h-3.5 w-3.5" /> Asignar materia
+                  </Button>
+                }
+              />
+              <div className="mt-3 overflow-x-auto">
+                {data.offerings.length === 0 ? (
+                  <EmptyState
+                    icon={CalendarRange}
+                    title="Sin materias asignadas"
+                    description="Asigna una materia a un profesor para abrir la oferta académica."
+                  />
+                ) : (
+                  <table className="w-full min-w-[1000px] text-left text-sm">
+                    <thead>
+                      <tr className="border-b border-slate-200 text-[10px] uppercase tracking-wide text-slate-400 dark:border-slate-800">
+                        <th className="pb-2 font-bold">Materia</th>
+                        <th className="pb-2 font-bold">Profesor</th>
+                        <th className="pb-2 font-bold">Horario</th>
+                        <th className="pb-2 font-bold">Periodo / grupo</th>
+                        <th className="pb-2 font-bold">Ocupación</th>
+                        <th className="pb-2 font-bold">Notas</th>
+                        <th className="pb-2 font-bold">Estado</th>
+                        <th className="pb-2 text-right font-bold">Acción</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                      {data.offerings.map((offering) => (
+                        <tr key={offering.id}>
+                          <td className="py-2.5 pr-3">
+                            <p className="font-semibold text-slate-900 dark:text-white">{offering.materia}</p>
+                            <p className="text-[11px] text-slate-400">{offering.codigo}</p>
+                          </td>
+                          <td className="py-2.5 pr-3 text-xs text-slate-600 dark:text-slate-300">
+                            {offering.profesor}
+                          </td>
+                          <td className="py-2.5 pr-3 text-xs text-slate-500 dark:text-slate-400">
+                            {offering.horario || 'Sin horario'}
+                          </td>
+                          <td className="py-2.5 pr-3 text-xs text-slate-500 dark:text-slate-400">
+                            {offering.periodo} · {offering.grupo}
+                          </td>
+                          <td className="py-2.5 pr-3 text-xs font-semibold text-slate-600 dark:text-slate-300">
+                            {offering.estudiantes} / {offering.cupo}
+                          </td>
+                          <td className="py-2.5 pr-3 text-xs text-slate-500 dark:text-slate-400">
+                            {offering.calificados}
+                          </td>
+                          <td className="py-2.5">
+                            <Badge tone={offering.estado === 'ABIERTA' ? 'success' : 'neutral'}>
+                              {offering.estado}
+                            </Badge>
+                          </td>
+                          <td className="py-2.5 text-right">
+                            <Button
+                              onClick={() => openOffering(offering)}
+                              variant="outline"
+                              className="ml-auto w-auto"
+                            >
+                              <ClipboardList className="h-3.5 w-3.5" /> Ver notas
+                            </Button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            </Card>
+          </div>
         )}
       </div>
+
+      <Modal
+        open={selectedOfferingId !== null}
+        onClose={closeOffering}
+        title={
+          selectedOffering
+            ? `${selectedOffering.materia} · ${selectedOffering.grupo}`
+            : 'Materia asignada'
+        }
+        subtitle={
+          selectedOffering
+            ? `${selectedOffering.codigo} · ${selectedOffering.profesor} · ${selectedOffering.periodo}`
+            : undefined
+        }
+        wide
+      >
+        {offeringStudentsLoading ? (
+          <Spinner label="Cargando estudiantes..." />
+        ) : offeringStudentsError ? (
+          <ErrorPanel message={offeringStudentsError} />
+        ) : offeringStudents.length === 0 ? (
+          <EmptyState
+            icon={Users}
+            title="Sin estudiantes matriculados"
+            description="Matricula un estudiante en esta materia para asignar calificaciones."
+          />
+        ) : (
+          <>
+            {notice && (
+              <div className="mb-4">
+                <Notice tone={notice.type} onClose={() => setNotice(null)}>
+                  {notice.type === 'success' ? (
+                    <CheckCircle2 className="h-4 w-4" />
+                  ) : (
+                    <ShieldCheck className="h-4 w-4" />
+                  )}
+                  {notice.text}
+                </Notice>
+              </div>
+            )}
+
+            <div className="space-y-3">
+              {offeringStudents.map((student) => {
+                const draft = gradeDrafts[student.matriculaId] || { nota: '', observaciones: '' }
+                const savingStudent = savingGradeId === student.matriculaId
+
+                return (
+                  <Card
+                    key={student.matriculaId}
+                    className="flex flex-col gap-4 p-4 sm:flex-row sm:items-end sm:justify-between"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="font-bold text-slate-900 dark:text-white">
+                        {student.nombreCompleto}
+                      </p>
+                      <p className="break-words text-xs text-slate-500 dark:text-slate-400">
+                        {student.email} · Doc. {student.documento}
+                      </p>
+                    </div>
+
+                    <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-end">
+                      <div className="w-full sm:w-24">
+                        <Input
+                          label="Nota (0-5)"
+                          type="number"
+                          min={0}
+                          max={5}
+                          step={0.1}
+                          value={draft.nota}
+                          onChange={(event) =>
+                            setGradeDrafts((current) => ({
+                              ...current,
+                              [student.matriculaId]: {
+                                ...current[student.matriculaId],
+                                nota: event.target.value,
+                              },
+                            }))
+                          }
+                        />
+                      </div>
+                      <div className="w-full sm:w-56">
+                        <Input
+                          label="Observaciones"
+                          value={draft.observaciones}
+                          onChange={(event) =>
+                            setGradeDrafts((current) => ({
+                              ...current,
+                              [student.matriculaId]: {
+                                ...current[student.matriculaId],
+                                observaciones: event.target.value,
+                              },
+                            }))
+                          }
+                          placeholder="Observación opcional"
+                        />
+                      </div>
+                      <Button
+                        onClick={() => saveGrade(student)}
+                        disabled={savingStudent}
+                        loading={savingStudent}
+                        variant="brand"
+                        className="w-full sm:w-auto"
+                      >
+                        <Save className="h-3.5 w-3.5" />
+                        {savingStudent ? 'Guardando' : 'Guardar'}
+                      </Button>
+                    </div>
+
+                    <Badge tone={gradeTone(student.nota)} className="self-start sm:self-auto">
+                      {student.nota !== null ? `Nota ${student.nota.toFixed(2)}` : 'Sin nota'}
+                    </Badge>
+                  </Card>
+                )
+              })}
+            </div>
+          </>
+        )}
+      </Modal>
     </Layout>
   )
 }

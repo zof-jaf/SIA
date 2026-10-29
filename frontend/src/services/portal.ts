@@ -107,6 +107,7 @@ export interface ProfessorOffering {
   calificados: number
   promedio: number | null
   horario: string | null
+  horarios: { dia: string; inicio: string; fin: string; aula: string }[]
 }
 
 export interface ProfessorDashboardData {
@@ -134,6 +135,25 @@ export interface OfferingStudent {
   fechaRegistro: string | null
 }
 
+export interface AdminOffering {
+  id: number
+  materiaId: number
+  codigo: string
+  materia: string
+  creditos: number
+  grupo: string
+  cupo: number
+  estado: string
+  periodoId: number
+  periodo: string
+  periodoActivo: boolean
+  profesorId: number | null
+  profesor: string
+  estudiantes: number
+  calificados: number
+  horario: string | null
+}
+
 export interface AdminDashboardData {
   period: Period | null
   stats: {
@@ -159,18 +179,7 @@ export interface AdminDashboardData {
     activo: boolean
     createdAt: string
   }[]
-  offerings: {
-    id: number
-    codigo: string
-    materia: string
-    grupo: string
-    cupo: number
-    estado: string
-    periodo: string
-    periodoActivo: boolean
-    profesor: string
-    estudiantes: number
-  }[]
+  offerings: AdminOffering[]
   programs: { id: number; codigo: string; nombre: string; estudiantes: number }[]
 }
 
@@ -276,6 +285,27 @@ export interface CreateSubjectInput {
   creditos: number
   semestre?: number
   activo?: boolean
+  profesor_id?: number
+  periodo_id?: number
+  grupo?: string
+  cupo?: number
+}
+
+export interface CreateOfferingSchedule {
+  dia_semana: string
+  hora_inicio: string
+  hora_fin: string
+  aula?: string
+}
+
+export interface CreateOfferingInput {
+  materia_id: number
+  profesor_id: number
+  periodo_id: number
+  grupo?: string
+  cupo?: number
+  estado?: 'ABIERTA' | 'ACTIVA' | 'CERRADA'
+  horarios?: CreateOfferingSchedule[]
 }
 
 interface Envelope<T> {
@@ -311,6 +341,29 @@ export const portalService = {
     const res = await apiRequest<Envelope<OfferingStudent[]>>(
       `/api/portal/professor/offerings/${offeringId}/students`,
     )
+    return res.data
+  },
+
+  adminOfferingStudents: async (offeringId: number) => {
+    const res = await apiRequest<Envelope<OfferingStudent[]>>(
+      `/api/portal/admin/offerings/${offeringId}/students`,
+    )
+    return res.data
+  },
+
+  enrollStudent: async (estudianteId: number, ofertaId: number) => {
+    const res = await apiRequest<Envelope<unknown>>('/api/matriculas', {
+      method: 'POST',
+      body: JSON.stringify({ estudiante_id: estudianteId, oferta_materia_id: ofertaId }),
+    })
+    return res.data
+  },
+
+  createOffering: async (data: CreateOfferingInput) => {
+    const res = await apiRequest<Envelope<unknown>>('/api/academic/offerings', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    })
     return res.data
   },
 
@@ -421,15 +474,8 @@ export const portalService = {
     return res.data
   },
 
-  createSubject: async (data: {
-    nombre: string
-    codigo: string
-    descripcion?: string
-    creditos: number
-    semestre?: number
-    activo?: boolean
-  }) => {
-    const res = await apiRequest<Envelope<unknown>>('/api/academic/subjects', {
+  createSubject: async (data: CreateSubjectInput) => {
+    const res = await apiRequest<Envelope<Subject>>('/api/academic/subjects', {
       method: 'POST',
       body: JSON.stringify(data),
     })

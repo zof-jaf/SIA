@@ -1,10 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   BookOpen,
+  CalendarDays,
   ClipboardList,
+  Clock,
   GraduationCap,
   LayoutDashboard,
   Mail,
+  MapPin,
   Save,
   Users,
 } from 'lucide-react'
@@ -34,8 +37,19 @@ import { gradeTone } from '../lib/format'
 
 const NAV = [
   { label: 'Resumen', href: '#resumen', icon: LayoutDashboard },
+  { label: 'Mi horario', href: '#horario', icon: CalendarDays },
   { label: 'Mis cursos', href: '#cursos', icon: BookOpen },
 ]
+
+const DAY_ORDER: Record<string, number> = {
+  Lunes: 1,
+  Martes: 2,
+  Miércoles: 3,
+  Jueves: 4,
+  Viernes: 5,
+  Sábado: 6,
+  Domingo: 7,
+}
 
 interface GradeDraft {
   nota: string
@@ -75,6 +89,25 @@ export default function ProfessorDashboard() {
   const selectedOffering = useMemo(
     () => data?.offerings.find((offering) => offering.id === selectedId) ?? null,
     [data, selectedId],
+  )
+
+  const schedule = useMemo(
+    () =>
+      (data?.offerings || [])
+        .flatMap((offering) =>
+          offering.horarios.map((horario) => ({
+            ...horario,
+            materia: offering.materia,
+            codigo: offering.codigo,
+            grupo: offering.grupo,
+          })),
+        )
+        .sort(
+          (a, b) =>
+            (DAY_ORDER[a.dia] || 99) - (DAY_ORDER[b.dia] || 99) ||
+            a.inicio.localeCompare(b.inicio),
+        ),
+    [data],
   )
 
   const openOffering = async (offeringId: number) => {
@@ -196,6 +229,61 @@ export default function ProfessorDashboard() {
         </Card>
 
         <StatsRow stats={stats} />
+
+        <Card id="horario">
+          <SectionHead label="Horario asignado" icon={CalendarDays} />
+          {schedule.length === 0 ? (
+            <div className="mt-3">
+              <EmptyState
+                icon={CalendarDays}
+                title="Sin horario asignado"
+                description="Tus cursos aún no tienen bloques de horario registrados."
+              />
+            </div>
+          ) : (
+            <div className="mt-3 overflow-x-auto">
+              <table className="w-full min-w-[700px] text-left text-sm">
+                <thead>
+                  <tr className="border-b border-slate-200 text-[10px] uppercase tracking-wide text-slate-400 dark:border-slate-800">
+                    <th className="pb-2 font-bold">Día</th>
+                    <th className="pb-2 font-bold">Hora</th>
+                    <th className="pb-2 font-bold">Materia</th>
+                    <th className="pb-2 font-bold">Grupo</th>
+                    <th className="pb-2 font-bold">Aula</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                  {schedule.map((block, index) => (
+                    <tr key={`${block.materia}-${block.dia}-${block.inicio}-${index}`}>
+                      <td className="py-2.5 pr-3">
+                        <Badge tone="brand">{block.dia}</Badge>
+                      </td>
+                      <td className="py-2.5 pr-3 text-xs font-semibold text-slate-600 dark:text-slate-300">
+                        <span className="inline-flex items-center gap-1">
+                          <Clock className="h-3.5 w-3.5 text-slate-400" />
+                          {block.inicio} - {block.fin}
+                        </span>
+                      </td>
+                      <td className="py-2.5 pr-3">
+                        <p className="font-semibold text-slate-900 dark:text-white">{block.materia}</p>
+                        <p className="text-[11px] text-slate-400">{block.codigo}</p>
+                      </td>
+                      <td className="py-2.5 pr-3 text-xs text-slate-500 dark:text-slate-400">
+                        {block.grupo}
+                      </td>
+                      <td className="py-2.5 text-xs text-slate-500 dark:text-slate-400">
+                        <span className="inline-flex items-center gap-1">
+                          <MapPin className="h-3.5 w-3.5 text-slate-400" />
+                          {block.aula}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </Card>
 
         <Card id="cursos">
           <SectionHead label="Cursos asignados" icon={BookOpen} />
