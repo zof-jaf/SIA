@@ -133,17 +133,38 @@ class PortalService {
     );
 
     const curriculumIds = new Set(curriculum.map((item) => item.materia_id));
-    const normalizedGrades = grades.map((row) => ({
+    const history = grades.map((row) => ({
       materiaId: row.materia_id,
       codigo: row.codigo,
       materia: row.materia,
       creditos: row.creditos,
+      periodoId: row.periodo_id,
+      periodo: row.periodo,
+      periodoActivo: row.periodo_activo,
       nota: toNumber(row.nota),
       evaluaciones: Number(row.evaluaciones),
-      fechaRegistro: row.fecha_registro
+      fechaRegistro: row.fecha_registro,
+      observaciones: row.observaciones || null
     }));
+    const normalizedGrades = history.filter((grade) => grade.periodoActivo);
 
-    const approvedGrades = normalizedGrades.filter((grade) => grade.nota !== null && grade.nota >= 3);
+    const progressGrades = Array.from(
+      history
+        .reduce((current, grade) => {
+          const previous = current.get(grade.materiaId);
+          const previousScore = previous && previous.nota !== null ? previous.nota : -1;
+          const gradeScore = grade.nota !== null ? grade.nota : -1;
+
+          if (!previous || gradeScore > previousScore) {
+            current.set(grade.materiaId, grade);
+          }
+
+          return current;
+        }, new Map())
+        .values()
+    );
+
+    const approvedGrades = progressGrades.filter((grade) => grade.nota !== null && grade.nota >= 3);
     const approvedInProgram = profile.programa_id
       ? approvedGrades.filter((grade) => curriculumIds.has(grade.materiaId))
       : approvedGrades;
@@ -152,7 +173,7 @@ class PortalService {
     const approvedCredits = approvedInProgram.reduce((sum, item) => sum + (item.creditos || 0), 0);
     const pendingCredits = totalCredits > 0 ? Math.max(totalCredits - approvedCredits, 0) : 0;
 
-    const scoredGrades = normalizedGrades.filter((grade) => grade.nota !== null);
+    const scoredGrades = progressGrades.filter((grade) => grade.nota !== null);
     const average = scoredGrades.length
       ? Number(
           (
@@ -162,7 +183,7 @@ class PortalService {
       : null;
 
     const approvedIds = new Set(approvedInProgram.map((grade) => grade.materiaId));
-    const pendingCourses = curriculum
+    const pendingCurriculum = curriculum
       .filter((item) => !approvedIds.has(item.materia_id))
       .map((item) => ({
         materiaId: item.materia_id,
@@ -172,12 +193,18 @@ class PortalService {
         semestre: item.semestre
       }));
 
+    const pendingCourses = courses.filter(
+      (course) => course.periodoActivo && course.estado === 'ACTIVA' && course.nota === null
+    );
+
     return {
       profile: shapeProfile(profile),
       period: period || null,
       courses,
+      pendingCourses,
       schedule,
       grades: normalizedGrades,
+      history,
       progress: {
         totalCredits,
         approvedCredits,
@@ -191,7 +218,7 @@ class PortalService {
           creditos: grade.creditos,
           nota: grade.nota
         })),
-        pendingCourses,
+        pendingCourses: pendingCurriculum,
         hasCurriculum: curriculum.length > 0
       }
     };

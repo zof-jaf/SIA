@@ -74,16 +74,22 @@ class PortalRepository {
     const query = `
       SELECT
         m.id AS materia_id, m.codigo, m.nombre AS materia, m.creditos,
+        pr.id AS periodo_id, pr.nombre AS periodo, pr.activo AS periodo_activo,
         MAX(c.nota) AS nota,
         COUNT(c.id) AS evaluaciones,
-        MAX(c.fecha_registro) AS fecha_registro
+        MAX(c.fecha_registro) AS fecha_registro,
+        (
+          ARRAY_AGG(c.observaciones ORDER BY c.fecha_registro DESC NULLS LAST, c.id DESC)
+          FILTER (WHERE c.observaciones IS NOT NULL)
+        )[1] AS observaciones
       FROM matriculas ma
       JOIN ofertas_materias o ON o.id = ma.oferta_materia_id
       JOIN materias m ON m.id = o.materia_id
+      JOIN periodos_academicos pr ON pr.id = o.periodo_id
       JOIN calificaciones c ON c.matricula_id = ma.id
       WHERE ma.estudiante_id = $1
-      GROUP BY m.id, m.codigo, m.nombre, m.creditos
-      ORDER BY m.nombre
+      GROUP BY m.id, m.codigo, m.nombre, m.creditos, pr.id, pr.nombre, pr.activo, pr.fecha_inicio
+      ORDER BY pr.fecha_inicio DESC, m.nombre
     `;
     const result = await pool.query(query, [estudianteId]);
     return result.rows;

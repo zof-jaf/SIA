@@ -58,9 +58,13 @@ export interface StudentGrade {
   codigo: string
   materia: string
   creditos: number
+  periodoId: number
+  periodo: string
+  periodoActivo: boolean
   nota: number | null
   evaluaciones: number
   fechaRegistro: string
+  observaciones: string | null
 }
 
 export interface ProgressCourse {
@@ -87,9 +91,34 @@ export interface StudentDashboardData {
   profile: Profile
   period: Period | null
   courses: StudentCourse[]
+  pendingCourses: StudentCourse[]
   schedule: ScheduleItem[]
   grades: StudentGrade[]
+  history: StudentGrade[]
   progress: StudentProgress
+}
+
+export interface Tramite {
+  id: number
+  estudianteId: number
+  documento: string
+  estudiante: string
+  email: string
+  periodoId: number | null
+  periodo: string | null
+  tipoTramite: string
+  estado: string
+  fechaSolicitud: string
+  fechaResolucion: string | null
+  detalles: string | null
+}
+
+export interface CreateTramiteInput {
+  estudiante_id: number
+  periodo_id?: number | null
+  tipo_tramite: string
+  estado?: string
+  detalles?: string
 }
 
 export interface ProfessorOffering {
@@ -369,6 +398,29 @@ export const portalService = {
 
   adminDashboard: async () => {
     const res = await apiRequest<Envelope<AdminDashboardData>>('/api/portal/admin/dashboard')
+    return res.data
+  },
+
+  listTramites: async (filters: { estado?: string; tipo_tramite?: string; estudiante_id?: number } = {}) => {
+    const params = new URLSearchParams()
+    if (filters.estado) params.set('estado', filters.estado)
+    if (filters.tipo_tramite) params.set('tipo_tramite', filters.tipo_tramite)
+    if (filters.estudiante_id) params.set('estudiante_id', String(filters.estudiante_id))
+    const query = params.toString()
+    const res = await apiRequest<Envelope<Tramite[]>>(`/api/tramites${query ? `?${query}` : ''}`)
+    return res.data
+  },
+
+  getTramite: async (id: number) => {
+    const res = await apiRequest<Envelope<Tramite>>(`/api/tramites/${id}`)
+    return res.data
+  },
+
+  createTramite: async (data: CreateTramiteInput) => {
+    const res = await apiRequest<Envelope<Tramite>>('/api/tramites', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    })
     return res.data
   },
 

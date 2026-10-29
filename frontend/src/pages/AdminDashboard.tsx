@@ -5,6 +5,7 @@ import {
   CalendarRange,
   CheckCircle2,
   ClipboardList,
+  FileText,
   GraduationCap,
   LayoutDashboard,
   Plus,
@@ -59,6 +60,7 @@ const NAV = [
   { label: 'Usuarios', href: '#usuarios', icon: Users },
   { label: 'Catálogo', href: '#catalogo', icon: BookOpen },
   { label: 'Oferta académica', href: '#oferta', icon: CalendarRange },
+  { label: 'Trámites', href: '/tramites', icon: FileText },
 ]
 
 const TAB_TITLES: Record<Tab, { title: string; subtitle: string }> = {

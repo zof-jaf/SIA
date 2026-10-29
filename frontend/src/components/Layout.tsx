@@ -9,6 +9,7 @@ export interface NavItem {
   label: string
   href: string
   icon: LucideIcon
+  onClick?: () => void
 }
 
 /**
@@ -48,10 +49,19 @@ export default function Layout({
 }) {
   const { user, logout } = useAuth()
   const [open, setOpen] = useState(false)
-  const [active, setActive] = useState(() => window.location.hash || nav[0]?.href || '#inicio')
+  const [active, setActive] = useState(() => {
+    const pathItem = nav.find((item) => item.href === window.location.pathname)
+    return pathItem?.href || window.location.hash || nav[0]?.href || '#inicio'
+  })
 
   useEffect(() => {
     const syncActive = () => {
+      const pathItem = nav.find((item) => item.href === window.location.pathname)
+      if (pathItem) {
+        setActive(pathItem.href)
+        return
+      }
+
       const hash = window.location.hash
       if (hash && nav.some((item) => item.href === hash)) setActive(hash)
     }
@@ -114,7 +124,11 @@ export default function Layout({
               <a
                 key={item.href}
                 href={item.href}
-                onClick={() => {
+                onClick={(event) => {
+                  if (item.onClick) {
+                    event.preventDefault()
+                    item.onClick()
+                  }
                   setActive(item.href)
                   setOpen(false)
                 }}

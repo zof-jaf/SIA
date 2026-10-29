@@ -172,6 +172,9 @@ export function Modal({
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/60 p-0 backdrop-blur-sm sm:items-center sm:p-4">
       <button className="absolute inset-0 cursor-default" aria-label="Cerrar" onClick={onClose} />
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
         className={cn(
           'animate-modal-in relative max-h-[92vh] w-full overflow-hidden rounded-t-2xl border border-slate-200 bg-white shadow-2xl sm:rounded-2xl dark:border-slate-800 dark:bg-[#181b20]',
           wide ? 'sm:max-w-3xl' : 'sm:max-w-xl',
@@ -184,6 +187,7 @@ export function Modal({
           </div>
           <button
             onClick={onClose}
+            aria-label="Cerrar"
             className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200"
           >
             <X className="h-5 w-5" />

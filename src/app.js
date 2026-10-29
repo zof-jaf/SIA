@@ -12,6 +12,7 @@ const academicRoutes = require('./routes/academicRoutes');
 const matriculaRoutes = require('./routes/matriculaRoutes');
 const calificacionRoutes = require('./routes/calificacionRoutes');
 const portalRoutes = require('./routes/portalRoutes');
+const tramiteRoutes = require('./routes/tramiteRoutes');
 
 const app = express();
 
@@ -26,6 +27,7 @@ app.use('/api/academic', academicRoutes);
 app.use('/api/matriculas', matriculaRoutes);
 app.use('/api/calificaciones', calificacionRoutes);
 app.use('/api/portal', portalRoutes);
+app.use('/api/tramites', tramiteRoutes);
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'OK', message: 'Servidor activo' });

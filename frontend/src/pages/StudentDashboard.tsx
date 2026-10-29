@@ -5,6 +5,7 @@ import {
   BookOpen,
   CalendarClock,
   CalendarDays,
+  CalendarRange,
   CheckCircle2,
   ChevronRight,
   ClipboardList,
@@ -14,7 +15,7 @@ import {
   GraduationCap,
   LayoutDashboard,
   MapPin,
-  Plus,
+  MessageSquare,
   User,
   TrendingUp,
   Wallet,
@@ -36,17 +37,35 @@ import {
 import { portalService, type AvailableOffering, type StudentDashboardData } from '../services/portal'
 import { formatDate, formatTime12, getNextClass, gradeTone, timeToMinutes } from '../lib/format'
 
-type ModalName = 'schedule' | 'progress' | 'finance' | 'procedures' | null
+type ModalName =
+  | 'enrollment'
+  | 'schedule'
+  | 'subjects'
+  | 'grades'
+  | 'history'
+  | 'progress'
+  | 'finance'
+  | null
 
 const NAV = [
   { label: 'Inicio', href: '#inicio', icon: LayoutDashboard },
-  { label: 'Matrícula', href: '#matricula', icon: Plus },
+  { label: 'Periodo', href: '#matricula', icon: CalendarRange },
   { label: 'Mi horario', href: '#horario', icon: CalendarDays },
   { label: 'Mis materias', href: '#materias', icon: BookOpen },
-  { label: 'Notas', href: '#notas', icon: Award },
+  { label: 'Calificaciones', href: '#notas', icon: Award },
   { label: 'Historial', href: '#historial', icon: FileText },
   { label: 'Progreso', href: '#progreso', icon: GraduationCap },
+  { label: 'Trámites', href: '/tramites', icon: ClipboardList },
 ]
+
+const MODAL_BY_HASH: Record<string, ModalName> = {
+  '#matricula': 'enrollment',
+  '#horario': 'schedule',
+  '#materias': 'subjects',
+  '#notas': 'grades',
+  '#historial': 'history',
+  '#progreso': 'progress',
+}
 
 const DAY_ORDER: Record<string, number> = {
   lunes: 1,
@@ -70,12 +89,16 @@ export default function StudentDashboard() {
   const [error, setError] = useState('')
   const [modal, setModal] = useState<ModalName>(null)
   const [hasDebt, setHasDebt] = useState(false)
-  const [hasProcedure, setHasProcedure] = useState(true)
   const [offerings, setOfferings] = useState<AvailableOffering[]>([])
   const [offeringsLoading, setOfferingsLoading] = useState(true)
   const [offeringsError, setOfferingsError] = useState('')
   const [enrollingId, setEnrollingId] = useState<number | null>(null)
   const [notice, setNotice] = useState<{ tone: 'success' | 'error'; text: string } | null>(null)
+
+  const nav = NAV.map((item) => {
+    const target = MODAL_BY_HASH[item.href]
+    return target ? { ...item, onClick: () => setModal(target) } : item
+  })
 
   const load = useCallback(() => {
     setLoading(true)
@@ -133,7 +156,7 @@ export default function StudentDashboard() {
 
   if (loading) {
     return (
-      <Layout title="Panel del estudiante" nav={NAV}>
+      <Layout title="Panel del estudiante" nav={nav}>
         <Spinner />
       </Layout>
     )
@@ -141,13 +164,13 @@ export default function StudentDashboard() {
 
   if (error || !data) {
     return (
-      <Layout title="Panel del estudiante" nav={NAV}>
+      <Layout title="Panel del estudiante" nav={nav}>
         <ErrorPanel message={error || 'No se pudo cargar la información.'} onRetry={load} />
       </Layout>
     )
   }
 
-  const { profile, period, courses, schedule, grades, progress } = data
+  const { profile, period, courses, pendingCourses, schedule, grades, history, progress } = data
   const nextClass = getNextClass(schedule)
   const sortedSchedule = [...schedule].sort((a, b) => {
     const dayDiff = (DAY_ORDER[a.dia?.toLowerCase()] ?? 9) - (DAY_ORDER[b.dia?.toLowerCase()] ?? 9)
@@ -157,12 +180,16 @@ export default function StudentDashboard() {
     ? `${progress.percentage}%`
     : `${progress.approvedCredits}`
   const scoreCaption = progress.hasCurriculum ? 'Avance' : 'Créditos'
+  const gradedInPeriod = grades.filter((grade) => grade.nota !== null)
+  const activeAverage = gradedInPeriod.length
+    ? gradedInPeriod.reduce((sum, grade) => sum + (grade.nota || 0), 0) / gradedInPeriod.length
+    : null
 
   return (
     <Layout
       title="Panel del estudiante"
       subtitle={`${profile.programa || 'Programa no asignado'} · Código ${profile.documento || 'sin registrar'}`}
-      nav={NAV}
+      nav={nav}
     >
       <div className="animate-fade-up space-y-5">
         <Card id="inicio" className="relative overflow-hidden border-brand/20 bg-gradient-to-br from-white via-white to-sky-50 dark:border-brand/20 dark:from-[#181b20] dark:via-[#181b20] dark:to-[#13232d]">
@@ -187,16 +214,18 @@ export default function StudentDashboard() {
 
             <div className="flex flex-wrap gap-2">
               <button
+                onClick={() => setModal('enrollment')}
+                className="rounded-xl border border-brand/30 bg-brand/10 px-3 py-2 text-xs font-semibold text-brand transition hover:bg-brand/15"
+              >
+                <span className="inline-flex items-center gap-1.5">
+                  <CalendarRange className="h-3.5 w-3.5" /> Periodo y matrícula
+                </span>
+              </button>
+              <button
                 onClick={() => setHasDebt((current) => !current)}
                 className="rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700 transition hover:bg-amber-100 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300"
               >
                 Simular: {hasDebt ? 'Al día' : 'Con deuda'}
-              </button>
-              <button
-                onClick={() => setHasProcedure((current) => !current)}
-                className="rounded-xl border border-sky-300 bg-sky-50 px-3 py-2 text-xs font-semibold text-sky-700 transition hover:bg-sky-100 dark:border-sky-500/30 dark:bg-sky-500/10 dark:text-sky-300"
-              >
-                Simular: {hasProcedure ? 'Sin trámites' : '1 trámite'}
               </button>
             </div>
           </div>
@@ -232,90 +261,43 @@ export default function StudentDashboard() {
           />
         </div>
 
-        <Card id="matricula">
+        <Card>
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <SectionTitle icon={ClipboardList} label="Matrícula académica" />
-            <Badge tone="neutral">{offerings.filter((offering) => !offering.matriculado).length} ofertas disponibles</Badge>
+            <SectionTitle icon={ClipboardList} label="Accesos académicos" />
+            <Badge tone="neutral">Todo en ventanas emergentes</Badge>
           </div>
-
-          {notice && (
-            <div className="mt-4">
-              <Notice tone={notice.tone} onClose={() => setNotice(null)}>
-                {notice.tone === 'success' ? (
-                  <CheckCircle2 className="h-4 w-4" />
-                ) : (
-                  <AlertTriangle className="h-4 w-4" />
-                )}
-                {notice.text}
-              </Notice>
-            </div>
-          )}
-
-          {offeringsLoading ? (
-            <div className="mt-4">
-              <Spinner label="Cargando oferta académica..." />
-            </div>
-          ) : offeringsError ? (
-            <div className="mt-4">
-              <ErrorPanel message={offeringsError} onRetry={loadOfferings} />
-            </div>
-          ) : offerings.length === 0 ? (
-            <div className="mt-4">
-              <EmptyState
-                icon={BookOpen}
-                title="Sin ofertas disponibles"
-                description="No hay materias abiertas para matrícula en el periodo activo."
-              />
-            </div>
-          ) : (
-            <div className="mt-4 overflow-x-auto">
-              <table className="w-full min-w-[760px] text-left text-sm">
-                <thead>
-                  <tr className="border-b border-slate-200 text-[11px] uppercase tracking-wide text-slate-400 dark:border-slate-800">
-                    <th className="pb-2 font-bold">Materia</th>
-                    <th className="pb-2 font-bold">Profesor</th>
-                    <th className="pb-2 font-bold">Horario</th>
-                    <th className="pb-2 font-bold">Cupos</th>
-                    <th className="pb-2 text-right font-bold">Acción</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                  {offerings.map((offering) => {
-                    const full = offering.cupo > 0 && offering.estudiantes >= offering.cupo
-
-                    return (
-                      <tr key={offering.id}>
-                        <td className="py-3 pr-4">
-                          <p className="font-bold text-slate-900 dark:text-white">{offering.materia}</p>
-                          <p className="text-xs text-slate-400">
-                            {offering.codigo} · Grupo {offering.grupo} · {offering.creditos} créditos
-                          </p>
-                        </td>
-                        <td className="py-3 pr-4 text-slate-600 dark:text-slate-300">{offering.profesor}</td>
-                        <td className="py-3 pr-4 text-xs text-slate-500 dark:text-slate-400">
-                          {offering.horario || 'Sin horario'}
-                        </td>
-                        <td className="py-3 pr-4 text-xs font-semibold text-slate-600 dark:text-slate-300">
-                          {offering.estudiantes} / {offering.cupo}
-                        </td>
-                        <td className="py-3 text-right">
-                          <Button
-                            onClick={() => enroll(offering)}
-                            disabled={offering.matriculado || full || enrollingId === offering.id}
-                            loading={enrollingId === offering.id}
-                            variant={offering.matriculado ? 'ghost' : 'brand'}
-                            className="ml-auto"
-                          >
-                            {offering.matriculado ? 'Matriculado' : full ? 'Sin cupo' : 'Matricularme'}
-                          </Button>
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
+          <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+            <QuickAccess
+              icon={CalendarRange}
+              label="Periodo y matrícula"
+              hint={`${offerings.filter((offering) => !offering.matriculado).length} ofertas disponibles`}
+              onClick={() => setModal('enrollment')}
+            />
+            <QuickAccess
+              icon={CalendarDays}
+              label="Mi horario"
+              hint={`${schedule.length} bloques semanales`}
+              onClick={() => setModal('schedule')}
+            />
+            <QuickAccess
+              icon={BookOpen}
+              label="Mis materias"
+              hint={`${pendingCourses.length} sin nota registrada`}
+              onClick={() => setModal('subjects')}
+            />
+            <QuickAccess
+              icon={Award}
+              label="Calificaciones"
+              hint={`${grades.length} del periodo activo`}
+              onClick={() => setModal('grades')}
+            />
+            <QuickAccess
+              icon={FileText}
+              label="Historial"
+              hint={`${history.length} registros completos`}
+              onClick={() => setModal('history')}
+            />
+          </div>
         </Card>
 
         <div className="grid gap-4 lg:grid-cols-12">
@@ -468,184 +450,325 @@ export default function StudentDashboard() {
           <Card>
             <SectionTitle icon={FileText} label="Ventanilla académica" />
             <h3 className="mt-4 text-lg font-bold text-slate-900 dark:text-white">Gestión de trámites</h3>
-            <div
-              className={cn(
-                'mt-3 rounded-xl px-3 py-2.5 text-xs font-semibold',
-                hasProcedure
-                  ? 'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300'
-                  : 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300',
-              )}
-            >
-              {hasProcedure ? 'Tienes 1 trámite en curso (Certificado oficial)' : 'No tienes trámites pendientes'}
-            </div>
-            <p className="mt-3 text-xs text-slate-400">
-              Radicación de certificados y constancias · Datos demostrativos.
+            <p className="mt-3 flex-1 text-sm text-slate-500 dark:text-slate-400">
+              Consulta el estado de tus solicitudes y revisa las observaciones de cada radicado.
             </p>
-            <button
-              onClick={() => setModal('procedures')}
-              className="mt-4 flex w-full items-center justify-between border-t border-slate-100 pt-3 text-xs font-bold text-brand dark:border-slate-800"
+            <a
+              href="/tramites"
+              className="mt-4 flex items-center justify-between border-t border-slate-100 pt-3 text-xs font-bold text-brand dark:border-slate-800"
             >
               Ingresar a trámites
               <ChevronRight className="h-4 w-4" />
-            </button>
+            </a>
           </Card>
         </div>
 
-        <Card id="materias">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <SectionTitle icon={BookOpen} label="Mis materias" />
-            <Badge tone="neutral">{courses.length} matrículas</Badge>
+      </div>
+
+      <Modal
+        open={modal === 'enrollment'}
+        onClose={() => setModal(null)}
+        title="Periodo académico y matrícula"
+        subtitle={period ? `Periodo ${period.nombre}` : 'No hay un periodo activo'}
+        wide
+      >
+        <div className="space-y-5">
+          <div className="rounded-xl border border-brand/20 bg-brand/5 px-4 py-3 dark:border-brand/30 dark:bg-brand/10">
+            {period ? (
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <p className="text-sm font-bold text-slate-900 dark:text-white">{period.nombre}</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    {formatDate(period.fecha_inicio)} - {formatDate(period.fecha_fin)}
+                  </p>
+                </div>
+                <Badge tone="success">Periodo activo</Badge>
+              </div>
+            ) : (
+              <p className="text-sm font-semibold text-slate-600 dark:text-slate-300">
+                No hay un periodo académico activo para matricular materias.
+              </p>
+            )}
           </div>
 
-          {courses.length === 0 ? (
-            <div className="mt-4">
+          {notice && (
+            <Notice tone={notice.tone} onClose={() => setNotice(null)}>
+              {notice.tone === 'success' ? (
+                <CheckCircle2 className="h-4 w-4" />
+              ) : (
+                <AlertTriangle className="h-4 w-4" />
+              )}
+              {notice.text}
+            </Notice>
+          )}
+
+          <div>
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <SectionTitle icon={ClipboardList} label="Ofertas disponibles" />
+              <Badge tone="neutral">
+                {offerings.filter((offering) => !offering.matriculado).length} sin matricular
+              </Badge>
+            </div>
+
+            {offeringsLoading ? (
+              <Spinner label="Cargando oferta académica..." />
+            ) : offeringsError ? (
+              <ErrorPanel message={offeringsError} onRetry={loadOfferings} />
+            ) : offerings.length === 0 ? (
               <EmptyState
                 icon={BookOpen}
-                title="Sin materias matriculadas"
-                description="Cuando tengas matrículas activas aparecerán aquí con su docente y horario."
+                title="Sin ofertas disponibles"
+                description="No hay materias abiertas para matrícula en el periodo activo."
               />
-            </div>
-          ) : (
-            <div className="mt-4 overflow-x-auto">
-              <table className="w-full min-w-[720px] text-left text-sm">
-                <thead>
-                  <tr className="border-b border-slate-200 text-[11px] uppercase tracking-wide text-slate-400 dark:border-slate-800">
-                    <th className="pb-2 font-bold">Materia</th>
-                    <th className="pb-2 font-bold">Docente</th>
-                    <th className="pb-2 font-bold">Horario</th>
-                    <th className="pb-2 font-bold">Créditos</th>
-                    <th className="pb-2 font-bold">Nota</th>
-                    <th className="pb-2 font-bold">Estado</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                  {courses.map((course) => (
-                    <tr key={`${course.ofertaId}-${course.matriculaId}`}>
-                      <td className="py-3 pr-4">
-                        <p className="font-bold text-slate-900 dark:text-white">{course.materia}</p>
-                        <p className="text-xs text-slate-400">
-                          {course.codigo} · Grupo {course.grupo}
-                        </p>
-                      </td>
-                      <td className="py-3 pr-4 text-slate-600 dark:text-slate-300">{course.profesor}</td>
-                      <td className="py-3 pr-4 text-xs text-slate-500 dark:text-slate-400">
-                        {course.horarios.length === 0 ? (
-                          <span className="text-slate-400">Sin horario</span>
-                        ) : (
-                          course.horarios.map((h) => (
-                            <span key={`${h.dia}-${h.inicio}`} className="block">
-                              {h.dia} {formatTime12(h.inicio)} - {formatTime12(h.fin)} · {h.aula || 'Sin aula'}
-                            </span>
-                          ))
-                        )}
-                      </td>
-                      <td className="py-3 pr-4 font-semibold text-slate-700 dark:text-slate-200">{course.creditos}</td>
-                      <td className="py-3 pr-4">
-                        <Badge tone={gradeTone(course.nota)}>
-                          {course.nota !== null ? course.nota.toFixed(2) : 'Sin nota'}
-                        </Badge>
-                      </td>
-                      <td className="py-3">
-                        <Badge tone={course.estado === 'ACTIVA' ? 'success' : 'neutral'}>{course.estado}</Badge>
-                      </td>
+            ) : (
+              <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
+                <table className="w-full min-w-[720px] text-left text-sm">
+                  <thead className="bg-slate-50 dark:bg-slate-800/50">
+                    <tr className="text-[11px] uppercase tracking-wide text-slate-400">
+                      <th className="px-4 py-2 font-bold">Materia</th>
+                      <th className="px-4 py-2 font-bold">Profesor</th>
+                      <th className="px-4 py-2 font-bold">Horario</th>
+                      <th className="px-4 py-2 font-bold">Cupos</th>
+                      <th className="px-4 py-2 text-right font-bold">Acción</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </Card>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                    {offerings.map((offering) => {
+                      const full = offering.cupo > 0 && offering.estudiantes >= offering.cupo
 
-        <Card id="notas">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <SectionTitle icon={Award} label="Calificaciones" />
-            <Badge tone={progress.average !== null && progress.average >= 3 ? 'success' : 'neutral'}>
-              Promedio {progress.average !== null ? progress.average.toFixed(2) : '—'}
+                      return (
+                        <tr key={offering.id}>
+                          <td className="px-4 py-3">
+                            <p className="font-bold text-slate-900 dark:text-white">{offering.materia}</p>
+                            <p className="text-xs text-slate-400">
+                              {offering.codigo} · Grupo {offering.grupo} · {offering.creditos} créditos
+                            </p>
+                          </td>
+                          <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{offering.profesor}</td>
+                          <td className="px-4 py-3 text-xs text-slate-500 dark:text-slate-400">
+                            {offering.horario || 'Sin horario'}
+                          </td>
+                          <td className="px-4 py-3 text-xs font-semibold text-slate-600 dark:text-slate-300">
+                            {offering.estudiantes} / {offering.cupo}
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            <Button
+                              onClick={() => enroll(offering)}
+                              disabled={offering.matriculado || full || enrollingId === offering.id}
+                              loading={enrollingId === offering.id}
+                              variant={offering.matriculado ? 'ghost' : 'brand'}
+                              className="ml-auto"
+                            >
+                              {offering.matriculado ? 'Matriculado' : full ? 'Sin cupo' : 'Matricularme'}
+                            </Button>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          <div>
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <SectionTitle icon={CalendarClock} label="Horario resultante" />
+              <Badge tone="brand">{sortedSchedule.length} bloques</Badge>
+            </div>
+            {sortedSchedule.length === 0 ? (
+              <p className="rounded-xl border border-dashed border-slate-300 px-4 py-5 text-center text-xs text-slate-500 dark:border-slate-700 dark:text-slate-400">
+                Selecciona materias para construir tu horario del periodo.
+              </p>
+            ) : (
+              <div className="space-y-2">
+                {sortedSchedule.map((item, index) => (
+                  <div
+                    key={`${item.codigo}-${item.dia}-${item.inicio}-${index}`}
+                    className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 px-4 py-2.5 dark:border-slate-800"
+                  >
+                    <div className="min-w-0">
+                      <p className="text-sm font-bold text-slate-900 dark:text-white">{item.materia}</p>
+                      <p className="text-xs text-slate-500 dark:text-slate-400">
+                        {item.profesor} · {item.aula || 'Sin aula'}
+                      </p>
+                    </div>
+                    <p className="text-xs font-semibold text-slate-600 dark:text-slate-300">
+                      {item.dia} · {formatTime12(item.inicio)} - {formatTime12(item.fin)}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </Modal>
+
+      <Modal
+        open={modal === 'subjects'}
+        onClose={() => setModal(null)}
+        title="Mis materias pendientes"
+        subtitle="Materias activas sin nota registrada"
+        wide
+      >
+        {pendingCourses.length === 0 ? (
+          <EmptyState
+            icon={BookOpen}
+            title="No tienes materias pendientes"
+            description="Todas tus materias activas ya tienen una nota registrada o no tienes matrículas en el periodo."
+          />
+        ) : (
+          <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
+            <table className="w-full min-w-[680px] text-left text-sm">
+              <thead className="bg-slate-50 dark:bg-slate-800/50">
+                <tr className="text-[11px] uppercase tracking-wide text-slate-400">
+                  <th className="px-4 py-2 font-bold">Materia</th>
+                  <th className="px-4 py-2 font-bold">Docente</th>
+                  <th className="px-4 py-2 font-bold">Horario</th>
+                  <th className="px-4 py-2 font-bold">Créditos</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                {pendingCourses.map((course) => (
+                  <tr key={`${course.ofertaId}-${course.matriculaId}`}>
+                    <td className="px-4 py-3">
+                      <p className="font-bold text-slate-900 dark:text-white">{course.materia}</p>
+                      <p className="text-xs text-slate-400">
+                        {course.codigo} · Grupo {course.grupo} · {course.periodo}
+                      </p>
+                    </td>
+                    <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{course.profesor}</td>
+                    <td className="px-4 py-3 text-xs text-slate-500 dark:text-slate-400">
+                      {course.horarios.length === 0 ? (
+                        'Sin horario'
+                      ) : (
+                        course.horarios.map((horario) => (
+                          <span key={`${horario.dia}-${horario.inicio}`} className="block">
+                            {horario.dia} {formatTime12(horario.inicio)} - {formatTime12(horario.fin)}
+                          </span>
+                        ))
+                      )}
+                    </td>
+                    <td className="px-4 py-3 font-semibold text-slate-700 dark:text-slate-200">
+                      {course.creditos}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Modal>
+
+      <Modal
+        open={modal === 'grades'}
+        onClose={() => setModal(null)}
+        title="Calificaciones del periodo activo"
+        subtitle={period ? `Periodo ${period.nombre}` : 'Periodo actual'}
+        wide
+      >
+        <div className="space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 px-4 py-3 dark:border-slate-800">
+            <span className="text-sm font-semibold text-slate-600 dark:text-slate-300">
+              Promedio del periodo
+            </span>
+            <Badge tone={gradeTone(activeAverage)} className="text-sm">
+              {activeAverage !== null ? activeAverage.toFixed(2) : '—'}
             </Badge>
           </div>
 
           {grades.length === 0 ? (
-            <div className="mt-4">
-              <EmptyState
-                icon={Award}
-                title="Aún no tienes calificaciones"
-                description="Las notas registradas por tus profesores aparecerán en esta sección."
-              />
-            </div>
+            <EmptyState
+              icon={Award}
+              title="Aún no tienes calificaciones"
+              description="Las notas del periodo activo registradas por tus profesores aparecerán aquí."
+            />
           ) : (
-            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            <div className="divide-y divide-slate-100 rounded-xl border border-slate-200 dark:divide-slate-800 dark:border-slate-800">
               {grades.map((grade) => (
-                <div
-                  key={grade.materiaId}
-                  className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 px-4 py-3 dark:border-slate-800"
-                >
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-bold text-slate-900 dark:text-white">{grade.materia}</p>
-                    <p className="text-xs text-slate-400">
-                      {grade.codigo} · {grade.creditos} créditos · {grade.evaluaciones} evaluación(es)
-                      {grade.fechaRegistro ? ` · ${formatDate(grade.fechaRegistro)}` : ''}
-                    </p>
+                <div key={`${grade.materiaId}-${grade.periodoId}`} className="px-4 py-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-bold text-slate-900 dark:text-white">{grade.materia}</p>
+                      <p className="text-xs text-slate-400">
+                        {grade.codigo} · {grade.creditos} créditos · {grade.evaluaciones} evaluación(es)
+                        {grade.fechaRegistro ? ` · ${formatDate(grade.fechaRegistro)}` : ''}
+                      </p>
+                    </div>
+                    <Badge tone={gradeTone(grade.nota)} className="shrink-0 text-sm">
+                      {grade.nota !== null ? grade.nota.toFixed(2) : '—'}
+                    </Badge>
                   </div>
-                  <Badge tone={gradeTone(grade.nota)} className="shrink-0 text-sm">
-                    {grade.nota !== null ? grade.nota.toFixed(2) : '—'}
-                  </Badge>
+                  {grade.observaciones && (
+                    <p className="mt-2 flex items-start gap-1.5 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600 dark:bg-slate-800/50 dark:text-slate-300">
+                      <MessageSquare className="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-400" />
+                      {grade.observaciones}
+                    </p>
+                  )}
                 </div>
               ))}
             </div>
           )}
-        </Card>
+        </div>
+      </Modal>
 
-        <Card id="historial">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <SectionTitle icon={FileText} label="Historial académico" />
-            <Badge tone="neutral">{grades.length} materias con registro</Badge>
-          </div>
-
-          {grades.length === 0 ? (
-            <div className="mt-4">
-              <EmptyState
-                icon={FileText}
-                title="Sin historial de calificaciones"
-                description="El historial se construye con cada evaluación registrada por tus profesores."
-              />
-            </div>
-          ) : (
-            <div className="mt-4 overflow-x-auto">
-              <table className="w-full min-w-[620px] text-left text-sm">
-                <thead>
-                  <tr className="border-b border-slate-200 text-[11px] uppercase tracking-wide text-slate-400 dark:border-slate-800">
-                    <th className="pb-2 font-bold">Materia</th>
-                    <th className="pb-2 font-bold">Créditos</th>
-                    <th className="pb-2 font-bold">Evaluaciones</th>
-                    <th className="pb-2 font-bold">Último registro</th>
-                    <th className="pb-2 font-bold">Nota</th>
+      <Modal
+        open={modal === 'history'}
+        onClose={() => setModal(null)}
+        title="Historial académico completo"
+        subtitle="Todas las calificaciones registradas, sin filtro de periodo"
+        wide
+      >
+        {history.length === 0 ? (
+          <EmptyState
+            icon={FileText}
+            title="Sin historial de calificaciones"
+            description="El historial se construye con cada evaluación registrada por tus profesores."
+          />
+        ) : (
+          <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
+            <table className="w-full min-w-[760px] text-left text-sm">
+              <thead className="bg-slate-50 dark:bg-slate-800/50">
+                <tr className="text-[11px] uppercase tracking-wide text-slate-400">
+                  <th className="px-4 py-2 font-bold">Materia</th>
+                  <th className="px-4 py-2 font-bold">Periodo</th>
+                  <th className="px-4 py-2 font-bold">Evaluaciones</th>
+                  <th className="px-4 py-2 font-bold">Último registro</th>
+                  <th className="px-4 py-2 font-bold">Nota</th>
+                  <th className="px-4 py-2 font-bold">Observaciones</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                {history.map((grade) => (
+                  <tr key={`${grade.materiaId}-${grade.periodoId}`}>
+                    <td className="px-4 py-3">
+                      <p className="font-semibold text-slate-900 dark:text-white">{grade.materia}</p>
+                      <p className="text-xs text-slate-400">
+                        {grade.codigo} · {grade.creditos} créditos
+                      </p>
+                    </td>
+                    <td className="px-4 py-3 text-xs text-slate-500 dark:text-slate-400">
+                      {grade.periodo}
+                    </td>
+                    <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{grade.evaluaciones}</td>
+                    <td className="px-4 py-3 text-xs text-slate-500 dark:text-slate-400">
+                      {formatDate(grade.fechaRegistro)}
+                    </td>
+                    <td className="px-4 py-3">
+                      <Badge tone={gradeTone(grade.nota)}>
+                        {grade.nota !== null ? grade.nota.toFixed(2) : 'Sin nota'}
+                      </Badge>
+                    </td>
+                    <td className="max-w-[220px] px-4 py-3 text-xs text-slate-500 dark:text-slate-400">
+                      {grade.observaciones || 'Sin observaciones'}
+                    </td>
                   </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                  {grades.map((grade) => (
-                    <tr key={`history-${grade.materiaId}`}>
-                      <td className="py-3 pr-4">
-                        <p className="font-semibold text-slate-900 dark:text-white">{grade.materia}</p>
-                        <p className="text-xs text-slate-400">{grade.codigo}</p>
-                      </td>
-                      <td className="py-3 pr-4 text-slate-600 dark:text-slate-300">{grade.creditos}</td>
-                      <td className="py-3 pr-4 text-slate-600 dark:text-slate-300">{grade.evaluaciones}</td>
-                      <td className="py-3 pr-4 text-xs text-slate-500 dark:text-slate-400">
-                        {formatDate(grade.fechaRegistro)}
-                      </td>
-                      <td className="py-3">
-                        <Badge tone={gradeTone(grade.nota)}>
-                          {grade.nota !== null ? grade.nota.toFixed(2) : 'Sin nota'}
-                        </Badge>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </Card>
-      </div>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Modal>
 
       <Modal
         open={modal === 'schedule'}
@@ -764,30 +887,38 @@ export default function StudentDashboard() {
         </div>
       </Modal>
 
-      <Modal
-        open={modal === 'procedures'}
-        onClose={() => setModal(null)}
-        title="Trámites radicados"
-        subtitle="Ventanilla académica"
-      >
-        {hasProcedure ? (
-          <div className="space-y-2">
-            <div className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 px-4 py-3 dark:border-slate-800">
-              <div>
-                <p className="text-sm font-bold text-slate-900 dark:text-white">Certificado de calificaciones oficial</p>
-                <p className="text-xs text-slate-400">Radicado: 2026-TR-0492</p>
-              </div>
-              <Badge tone="warning">En curso</Badge>
-            </div>
-            <p className="rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-500 dark:bg-slate-800/50 dark:text-slate-400">
-              Dato demostrativo. El backend no cuenta con un módulo de trámites.
-            </p>
-          </div>
-        ) : (
-          <EmptyState icon={FileText} title="No tienes trámites pendientes" />
-        )}
-      </Modal>
     </Layout>
+  )
+}
+
+/**
+ * Botón de acceso rápido que abre una vista académica en una ventana emergente.
+ * @param props Icono, etiqueta, descripción y acción de apertura.
+ */
+function QuickAccess({
+  icon: Icon,
+  label,
+  hint,
+  onClick,
+}: {
+  icon: typeof BookOpen
+  label: string
+  hint: string
+  onClick: () => void
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className="group flex items-start gap-3 rounded-xl border border-slate-200 px-3.5 py-3 text-left transition hover:border-brand/40 hover:bg-brand/5 dark:border-slate-800 dark:hover:border-brand/40 dark:hover:bg-brand/10"
+    >
+      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand/10 text-brand transition group-hover:bg-brand group-hover:text-white">
+        <Icon className="h-4 w-4" />
+      </span>
+      <span className="min-w-0">
+        <span className="block text-sm font-bold text-slate-900 dark:text-white">{label}</span>
+        <span className="block text-[11px] leading-tight text-slate-500 dark:text-slate-400">{hint}</span>
+      </span>
+    </button>
   )
 }
 

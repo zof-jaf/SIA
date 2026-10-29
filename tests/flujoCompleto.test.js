@@ -35,11 +35,14 @@ describe('Pruebas Automáticas - Sistema Académico', () => {
   const agent = request.agent(app);
   const suffix = String(Date.now()).slice(-6);
   let adminCredentials;
+  let studentCredentials;
   let studentId;
   let offeringId;
+  let periodId;
   let programId;
   let subjectId;
   let enrollmentId;
+  let tramiteId;
 
   beforeAll(async () => {
     adminCredentials = await createTestAdmin();
@@ -105,6 +108,10 @@ describe('Pruebas Automáticas - Sistema Académico', () => {
     const studentRoleId = studentRoleRes.rows[0]?.id;
     expect(studentRoleId).toBeDefined();
 
+    const studentEmail = `estudiante.test.${suffix}@universidad.edu.co`;
+    const studentPassword = crypto.randomBytes(16).toString('hex');
+    studentCredentials = { email: studentEmail, password: studentPassword };
+
     const studentUserRes = await pool.query(
       `INSERT INTO usuarios (nombre, apellido, email, password_hash, rol_id, activo)
        VALUES ($1, $2, $3, $4, $5, true)
@@ -112,8 +119,8 @@ describe('Pruebas Automáticas - Sistema Académico', () => {
       [
         'Estudiante',
         'Prueba',
-        `estudiante.test.${suffix}@universidad.edu.co`,
-        await bcrypt.hash(crypto.randomBytes(16).toString('hex'), 10),
+        studentEmail,
+        await bcrypt.hash(studentPassword, 10),
         studentRoleId
       ]
     );
@@ -140,6 +147,8 @@ describe('Pruebas Automáticas - Sistema Académico', () => {
         [`Periodo ${suffix}`]
       );
     }
+
+    periodId = periodRes.rows[0].id;
 
     const offeringRes = await agent
       .post('/api/academic/offerings')
@@ -208,5 +217,118 @@ describe('Pruebas Automáticas - Sistema Académico', () => {
     expect(res.statusCode).toBe(200);
     expect(res.body.data).toHaveProperty('promedio');
     expect(Array.isArray(res.body.data.notas)).toBe(true);
+  });
+
+  test('10. POST /api/tramites - Radica un trámite como administrador', async () => {
+    const res = await agent
+      .post('/api/tramites')
+      .send({
+        estudiante_id: studentId,
+        periodo_id: periodId,
+        tipo_tramite: 'Certificado de calificaciones',
+        detalles: 'Solicitud creada por la prueba E2E'
+      });
+
+    expect(res.statusCode).toBe(201);
+    expect(res.body.data.estado).toBe('Pendiente');
+    expect(res.body.data.tipoTramite).toBe('Certificado de calificaciones');
+    expect(res.body.data.estudianteId).toBe(studentId);
+
+    tramiteId = res.body.data.id;
+  });
+
+  test('11. GET /api/tramites/:id - Consulta el trámite radicado', async () => {
+    const res = await agent.get(`/api/tramites/${tramiteId}`);
+
+    expect(res.statusCode).toBe(200);
+    expect(res.body.data.id).toBe(tramiteId);
+    expect(res.body.data.detalles).toContain('prueba E2E');
+  });
+
+  test('12. GET /api/tramites - El estudiante solo consulta sus trámites y no puede crear', async () => {
+    const studentAgent = request.agent(app);
+    const login = await studentAgent.post('/api/auth/login').send(studentCredentials);
+    expect(login.statusCode).toBe(200);
+
+    const list = await studentAgent.get('/api/tramites');
+    expect(list.statusCode).toBe(200);
+    expect(list.body.data.every((tramite) => tramite.estudianteId === studentId)).toBe(true);
+    expect(list.body.data.some((tramite) => tramite.id === tramiteId)).toBe(true);
+
+    const forbidden = await studentAgent
+      .post('/api/tramites')
+      .send({
+        estudiante_id: studentId,
+        tipo_tramite: 'Certificado de estudios'
+      });
+    expect(forbidden.statusCode).toBe(403);
+  });
+
+  test('13. GET /api/portal/student/dashboard - Separa periodo activo e historial completo', async () => {
+    const offeringContext = await pool.query(
+      'SELECT profesor_id FROM ofertas_materias WHERE id = $1',
+      [offeringId]
+    );
+    const profesorId = offeringContext.rows[0].profesor_id;
+
+    const historicalPeriod = await pool.query(
+      `INSERT INTO periodos_academicos (nombre, fecha_inicio, fecha_fin, activo)
+       VALUES ($1, CURRENT_DATE - INTERVAL '180 days', CURRENT_DATE - INTERVAL '60 days', false)
+       RETURNING id`,
+      [`Periodo histórico ${suffix}`]
+    );
+
+    const historicalOffering = await pool.query(
+      `INSERT INTO ofertas_materias (materia_id, profesor_id, periodo_id, grupo, cupo, estado)
+       VALUES ($1, $2, $3, $4, 30, 'CERRADA')
+       RETURNING id`,
+      [subjectId, profesorId, historicalPeriod.rows[0].id, `HIS-${suffix}`]
+    );
+
+    const historicalEnrollment = await pool.query(
+      `INSERT INTO matriculas (estudiante_id, oferta_materia_id, fecha_matricula, estado)
+       VALUES ($1, $2, CURRENT_TIMESTAMP, 'ACTIVA')
+       RETURNING id`,
+      [studentId, historicalOffering.rows[0].id]
+    );
+
+    await pool.query(
+      `INSERT INTO calificaciones (matricula_id, nota, observaciones)
+       VALUES ($1, 3.2, 'Observación histórica de prueba')`,
+      [historicalEnrollment.rows[0].id]
+    );
+
+    const pendingOffering = await agent
+      .post('/api/academic/offerings')
+      .send({
+        materia_id: subjectId,
+        profesor_id: profesorId,
+        periodo_id: periodId,
+        grupo: `PEND-${suffix}`,
+        cupo: 30,
+        estado: 'ABIERTA'
+      });
+    expect(pendingOffering.statusCode).toBe(201);
+
+    const studentAgent = request.agent(app);
+    await studentAgent.post('/api/auth/login').send(studentCredentials);
+
+    const pendingEnrollment = await studentAgent
+      .post('/api/matriculas')
+      .send({ oferta_materia_id: pendingOffering.body.data.id });
+    expect(pendingEnrollment.statusCode).toBe(201);
+
+    const dashboard = await studentAgent.get('/api/portal/student/dashboard');
+    expect(dashboard.statusCode).toBe(200);
+
+    const { grades, history, pendingCourses } = dashboard.body.data;
+    expect(grades.every((grade) => grade.periodoActivo === true)).toBe(true);
+    expect(grades.some((grade) => grade.observaciones === 'Evaluación integral E2E aprobada')).toBe(true);
+    expect(history.length).toBeGreaterThan(grades.length);
+    expect(history.some((grade) => grade.periodoActivo === false)).toBe(true);
+    expect(
+      pendingCourses.some((course) => course.ofertaId === pendingOffering.body.data.id)
+    ).toBe(true);
+    expect(pendingCourses.every((course) => course.nota === null)).toBe(true);
   });
 });

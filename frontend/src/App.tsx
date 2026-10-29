@@ -8,6 +8,7 @@ import Login from './pages/Login'
 import StudentDashboard from './pages/StudentDashboard'
 import ProfessorDashboard from './pages/ProfessorDashboard'
 import AdminDashboard from './pages/AdminDashboard'
+import TramitesPage from './pages/TramitesPage'
 
 /**
  * Pantalla mostrada mientras se restaura la sesión desde la cookie httpOnly.
@@ -103,6 +104,14 @@ export default function App() {
               element={
                 <ProtectedRoute roles={['ADMINISTRADOR']}>
                   <AdminDashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/tramites"
+              element={
+                <ProtectedRoute roles={['ESTUDIANTE', 'ADMINISTRADOR']}>
+                  <TramitesPage />
                 </ProtectedRoute>
               }
             />
