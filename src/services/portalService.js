@@ -34,6 +34,24 @@ const shapeProfile = (profile) => ({
   profesorId: profile.profesor_id || null
 });
 
+/**
+ * Normaliza un estudiante matriculado para las vistas de notas.
+ * @param {object} row Fila de la consulta.
+ * @returns {object} Estudiante público.
+ */
+const shapeOfferingStudent = (row) => ({
+  matriculaId: row.matricula_id,
+  estudianteId: row.estudiante_id,
+  documento: row.documento,
+  nombre: row.nombre,
+  apellido: row.apellido,
+  nombreCompleto: `${row.nombre} ${row.apellido}`.trim(),
+  email: row.email,
+  nota: toNumber(row.nota),
+  observaciones: row.observaciones || null,
+  fechaRegistro: row.fecha_registro || null
+});
+
 const pickEnrollment = (current, incoming) => {
   if (!current) return incoming;
   const currentScore = current.nota === null ? -1 : Number(current.nota);
@@ -209,7 +227,8 @@ class PortalService {
       estudiantes: Number(row.estudiantes),
       calificados: Number(row.calificados),
       promedio: toNumber(row.promedio),
-      horario: row.horario || null
+      horario: row.horario || null,
+      horarios: Array.isArray(row.horarios) ? row.horarios : []
     }));
 
     const students = shapedOfferings.reduce((sum, item) => sum + item.estudiantes, 0);
@@ -247,18 +266,17 @@ class PortalService {
     const students = await portalRepository.getOfferingStudents(profile.profesor_id, offeringId);
     if (students === null) throw new Error('La oferta académica no existe o no está asignada a este profesor.');
 
-    return students.map((row) => ({
-      matriculaId: row.matricula_id,
-      estudianteId: row.estudiante_id,
-      documento: row.documento,
-      nombre: row.nombre,
-      apellido: row.apellido,
-      nombreCompleto: `${row.nombre} ${row.apellido}`.trim(),
-      email: row.email,
-      nota: toNumber(row.nota),
-      observaciones: row.observaciones || null,
-      fechaRegistro: row.fecha_registro || null
-    }));
+    return students.map(shapeOfferingStudent);
+  }
+
+  /**
+   * Lista estudiantes de una oferta para el panel administrativo.
+   * @param {number|string} offeringId Identificador de la oferta.
+   * @returns {Promise<object[]>} Estudiantes matriculados.
+   */
+  async getAdminOfferingStudents(offeringId) {
+    const students = await portalRepository.getOfferingStudentsByOffering(offeringId);
+    return students.map(shapeOfferingStudent);
   }
 
   /**
@@ -289,15 +307,21 @@ class PortalService {
       })),
       offerings: offerings.map((row) => ({
         id: row.id,
+        materiaId: row.materia_id,
         codigo: row.codigo,
         materia: row.materia,
+        creditos: row.creditos,
         grupo: row.grupo,
         cupo: row.cupo,
         estado: row.estado,
+        periodoId: row.periodo_id,
         periodo: row.periodo,
         periodoActivo: row.periodo_activo,
+        profesorId: row.profesor_id,
         profesor: row.profesor,
-        estudiantes: Number(row.estudiantes)
+        estudiantes: Number(row.estudiantes),
+        calificados: Number(row.calificados),
+        horario: row.horario || null
       })),
       programs: programStats.map((row) => ({
         id: row.id,

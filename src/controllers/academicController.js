@@ -47,6 +47,20 @@ class AcademicController {
   }
 
   /**
+   * Crea una oferta académica y la asigna a un profesor.
+   * @param {import('express').Request} req Petición con la oferta.
+   * @param {import('express').Response} res Respuesta HTTP.
+   */
+  async createOffering(req, res) {
+    try {
+      const result = await academicService.createOffering(req.body);
+      res.status(201).json({ success: true, message: 'Materia asignada al profesor con éxito', data: result });
+    } catch (error) {
+      res.status(error.status || 400).json({ success: false, error: error.message });
+    }
+  }
+
+  /**
    * Lista materias.
    * @param {import('express').Request} req Petición autenticada.
    * @param {import('express').Response} res Respuesta HTTP.

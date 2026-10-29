@@ -28,6 +28,13 @@ router.get(
 );
 
 router.get(
+  '/admin/offerings/:id/students',
+  authMiddleware,
+  requireRole(['ADMINISTRADOR']),
+  (req, res) => portalController.getAdminOfferingStudents(req, res)
+);
+
+router.get(
   '/admin/dashboard',
   authMiddleware,
   requireRole(['ADMINISTRADOR']),

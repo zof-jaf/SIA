@@ -159,7 +159,7 @@ class MatriculaRepository {
       JOIN periodos_academicos pr ON pr.id = o.periodo_id
       LEFT JOIN profesores pf ON pf.id = o.profesor_id
       LEFT JOIN usuarios up ON up.id = pf.usuario_id
-      WHERE pr.activo = true AND o.estado = 'ABIERTA'
+      WHERE pr.activo = true AND o.estado IN ('ABIERTA', 'ACTIVA')
       ORDER BY m.nombre, o.grupo
     `;
     const result = await pool.query(query, [estudianteId || null]);

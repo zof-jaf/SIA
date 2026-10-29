@@ -109,7 +109,9 @@ class MatriculaService {
 
     if (!oferta) throw new HttpError('La oferta académica no existe.', 404);
     if (!oferta.periodo_activo) throw new HttpError('El periodo de la oferta no está activo.', 409);
-    if (oferta.estado !== 'ABIERTA') throw new HttpError('La oferta no está abierta para matrícula.', 409);
+    if (!['ABIERTA', 'ACTIVA'].includes(oferta.estado)) {
+      throw new HttpError('La oferta no está abierta para matrícula.', 409);
+    }
 
     const existing = await matriculaRepository.findActiveEnrollment(estudianteId, ofertaId);
     if (existing) throw new HttpError('El estudiante ya tiene una matrícula activa en esta oferta.', 409);

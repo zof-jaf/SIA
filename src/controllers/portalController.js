@@ -61,6 +61,20 @@ class PortalController {
   }
 
   /**
+   * Devuelve los estudiantes y notas de una oferta para administración.
+   * @param {import('express').Request} req Petición con el id de la oferta.
+   * @param {import('express').Response} res Respuesta HTTP.
+   */
+  async getAdminOfferingStudents(req, res) {
+    try {
+      const data = await portalService.getAdminOfferingStudents(req.params.id);
+      res.json({ success: true, data });
+    } catch (error) {
+      res.status(error.status || 400).json({ success: false, error: error.message });
+    }
+  }
+
+  /**
    * Devuelve el panel administrativo.
    * @param {import('express').Request} req Petición autenticada.
    * @param {import('express').Response} res Respuesta HTTP.

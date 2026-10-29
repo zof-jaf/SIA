@@ -130,7 +130,20 @@ class PortalRepository {
             to_char(h.hora_fin, 'HH24:MI') || COALESCE(' · ' || h.aula, ''), ' / ')
           FROM horarios h
           WHERE h.oferta_materia_id = o.id
-        ) AS horario
+        ) AS horario,
+        COALESCE((
+          SELECT json_agg(
+            json_build_object(
+              'dia', h.dia_semana,
+              'inicio', to_char(h.hora_inicio, 'HH24:MI'),
+              'fin', to_char(h.hora_fin, 'HH24:MI'),
+              'aula', COALESCE(h.aula, 'Sin aula')
+            )
+            ORDER BY h.dia_semana, h.hora_inicio
+          )
+          FROM horarios h
+          WHERE h.oferta_materia_id = o.id
+        ), '[]'::json) AS horarios
       FROM ofertas_materias o
       JOIN materias m ON m.id = o.materia_id
       JOIN periodos_academicos pr ON pr.id = o.periodo_id
@@ -227,27 +240,76 @@ class PortalRepository {
     return result.rows;
   }
 
+  /**
+   * Lista todas las ofertas con materia, profesor, horario y ocupación.
+   * @returns {Promise<object[]>} Ofertas registradas.
+   */
   async getAdminOfferings() {
     const query = `
       SELECT
         o.id, o.grupo, o.cupo, o.estado,
-        m.codigo, m.nombre AS materia,
-        pr.nombre AS periodo, pr.activo AS periodo_activo,
+        m.id AS materia_id, m.codigo, m.nombre AS materia, m.creditos,
+        pr.id AS periodo_id, pr.nombre AS periodo, pr.activo AS periodo_activo,
+        pf.id AS profesor_id,
         CASE WHEN up.id IS NOT NULL THEN up.nombre || ' ' || up.apellido ELSE 'Sin asignar' END AS profesor,
         (
           SELECT COUNT(DISTINCT ma.estudiante_id)
           FROM matriculas ma
           WHERE ma.oferta_materia_id = o.id AND ma.estado = 'ACTIVA'
-        ) AS estudiantes
+        ) AS estudiantes,
+        (
+          SELECT COUNT(c.id)
+          FROM calificaciones c
+          JOIN matriculas ma ON ma.id = c.matricula_id
+          WHERE ma.oferta_materia_id = o.id
+        ) AS calificados,
+        (
+          SELECT string_agg(DISTINCT
+            h.dia_semana || ' ' || to_char(h.hora_inicio, 'HH24:MI') || '-' ||
+            to_char(h.hora_fin, 'HH24:MI') || COALESCE(' · ' || h.aula, ''), ' / ')
+          FROM horarios h
+          WHERE h.oferta_materia_id = o.id
+        ) AS horario
       FROM ofertas_materias o
       JOIN materias m ON m.id = o.materia_id
       JOIN periodos_academicos pr ON pr.id = o.periodo_id
       LEFT JOIN profesores pf ON pf.id = o.profesor_id
       LEFT JOIN usuarios up ON up.id = pf.usuario_id
-      ORDER BY pr.activo DESC, m.nombre
+      ORDER BY pr.activo DESC, m.nombre, o.grupo
     `;
     const result = await pool.query(query);
     return result.rows;
+  }
+
+  /**
+   * Lista estudiantes de una oferta sin validar propiedad docente.
+   * @param {number|string} ofertaId Identificador de la oferta.
+   * @returns {Promise<object[]>} Estudiantes matriculados con su última nota.
+   */
+  async getOfferingStudentsByOffering(ofertaId) {
+    const query = `
+      SELECT DISTINCT ON (e.id)
+        ma.id AS matricula_id, ma.estado AS matricula_estado,
+        e.id AS estudiante_id, e.documento,
+        u.nombre, u.apellido, u.email,
+        c.nota, c.observaciones, c.fecha_registro
+      FROM matriculas ma
+      JOIN estudiantes e ON e.id = ma.estudiante_id
+      JOIN usuarios u ON u.id = e.usuario_id
+      LEFT JOIN LATERAL (
+        SELECT nota, observaciones, fecha_registro
+        FROM calificaciones
+        WHERE matricula_id = ma.id
+        ORDER BY fecha_registro DESC, id DESC
+        LIMIT 1
+      ) c ON true
+      WHERE ma.oferta_materia_id = $1 AND ma.estado = 'ACTIVA'
+      ORDER BY e.id, ma.fecha_matricula DESC, ma.id DESC
+    `;
+    const result = await pool.query(query, [ofertaId]);
+    return result.rows.sort((a, b) =>
+      `${a.apellido} ${a.nombre}`.localeCompare(`${b.apellido} ${b.nombre}`)
+    );
   }
 
   async getAdminProgramStats() {

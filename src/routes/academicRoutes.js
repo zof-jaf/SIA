@@ -31,6 +31,13 @@ router.get(
 );
 
 router.post(
+  '/offerings',
+  authMiddleware,
+  requireRole(['ADMINISTRADOR']),
+  (req, res) => academicController.createOffering(req, res)
+);
+
+router.post(
   '/curriculum',
   authMiddleware,
   requireRole(['ADMINISTRADOR']),
