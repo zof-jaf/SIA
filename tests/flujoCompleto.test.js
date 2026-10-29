@@ -100,7 +100,7 @@ describe('Pruebas Automáticas - Sistema Académico', () => {
     expect(subjectId).toBeDefined();
   });
 
-  test('6. POST /api/matriculas - Registra una matrícula válida', async () => {
+  test('6. POST /api/academic/offerings y /api/matriculas - Asigna materia y matricula', async () => {
     const studentRoleRes = await pool.query("SELECT id FROM roles WHERE nombre = 'ESTUDIANTE'");
     const studentRoleId = studentRoleRes.rows[0]?.id;
     expect(studentRoleId).toBeDefined();
@@ -141,14 +141,29 @@ describe('Pruebas Automáticas - Sistema Académico', () => {
       );
     }
 
-    const offeringRes = await pool.query(
-      `INSERT INTO ofertas_materias (materia_id, profesor_id, periodo_id, grupo, cupo, estado)
-       VALUES ($1, $2, $3, $4, 30, 'ABIERTA')
-       RETURNING id`,
-      [subjectId, professorRes.rows[0].id, periodRes.rows[0].id, `TST-${suffix}`]
-    );
-    offeringId = offeringRes.rows[0]?.id;
+    const offeringRes = await agent
+      .post('/api/academic/offerings')
+      .send({
+        materia_id: subjectId,
+        profesor_id: professorRes.rows[0].id,
+        periodo_id: periodRes.rows[0].id,
+        grupo: `TST-${suffix}`,
+        cupo: 30,
+        estado: 'ABIERTA',
+        horarios: [
+          {
+            dia_semana: 'Lunes',
+            hora_inicio: '08:00',
+            hora_fin: '10:00',
+            aula: 'B-101'
+          }
+        ]
+      });
+
+    expect(offeringRes.statusCode).toBe(201);
+    offeringId = offeringRes.body.data.id;
     expect(offeringId).toBeDefined();
+    expect(offeringRes.body.data.horarios).toHaveLength(1);
 
     const offers = await agent.get(`/api/matriculas/ofertas?estudiante_id=${studentId}`);
     expect(offers.statusCode).toBe(200);
@@ -167,7 +182,14 @@ describe('Pruebas Automáticas - Sistema Académico', () => {
     enrollmentId = res.body.data.id;
   });
 
-  test('7. POST /api/calificaciones - Registra una calificación válida', async () => {
+  test('7. GET /api/portal/admin/offerings/:id/students - Lista estudiantes y notas desde administración', async () => {
+    const res = await agent.get(`/api/portal/admin/offerings/${offeringId}/students`);
+
+    expect(res.statusCode).toBe(200);
+    expect(res.body.data.some((student) => student.estudianteId === studentId)).toBe(true);
+  });
+
+  test('8. POST /api/calificaciones - Registra una calificación válida', async () => {
     const res = await agent
       .post('/api/calificaciones')
       .send({
@@ -180,7 +202,7 @@ describe('Pruebas Automáticas - Sistema Académico', () => {
     expect(Number(res.body.data.nota)).toBe(4.8);
   });
 
-  test('8. GET /api/calificaciones/estudiante/:id - Consulta histórico y promedio', async () => {
+  test('9. GET /api/calificaciones/estudiante/:id - Consulta histórico y promedio', async () => {
     const res = await agent.get(`/api/calificaciones/estudiante/${studentId}`);
 
     expect(res.statusCode).toBe(200);
